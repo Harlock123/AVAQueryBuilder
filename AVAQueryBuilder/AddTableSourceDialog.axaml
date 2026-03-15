@@ -1,0 +1,59 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:AVAQueryBuilder"
+        x:Class="AVAQueryBuilder.AddTableSourceDialog"
+        Title="Add Table Source"
+        Width="600" Height="500"
+        WindowStartupLocation="CenterOwner"
+        CanResize="False">
+    <Grid Margin="16" RowDefinitions="*,Auto">
+
+        <!-- Main content area -->
+        <Grid Grid.Row="0" ColumnDefinitions="*,*">
+
+            <!-- Left: Tables and Views lists -->
+            <Grid Grid.Column="0" RowDefinitions="Auto,*,Auto,*" Margin="0,0,8,0">
+
+                <TextBlock Grid.Row="0" Text="Tables:" FontWeight="SemiBold"
+                           FontSize="12" Margin="0,0,0,4" />
+                <ListBox x:Name="lstTables" Grid.Row="1"
+                         SelectionChanged="LstTables_SelectionChanged" />
+
+                <TextBlock Grid.Row="2" Text="Views:" FontWeight="SemiBold"
+                           FontSize="12" Margin="0,8,0,4" />
+                <ListBox x:Name="lstViews" Grid.Row="3"
+                         SelectionChanged="LstViews_SelectionChanged" />
+            </Grid>
+
+            <!-- Right: Columns checklist -->
+            <Grid Grid.Column="1" RowDefinitions="Auto,*" Margin="8,0,0,0">
+                <TextBlock x:Name="txtColumnsHeader" Grid.Row="0"
+                           Text="Columns:" FontWeight="SemiBold"
+                           FontSize="12" Margin="0,0,0,4" />
+                <ListBox x:Name="lstColumns" Grid.Row="1">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate x:DataType="local:ColumnItem">
+                            <CheckBox Content="{Binding Name}"
+                                      IsChecked="{Binding IsSelected}" />
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </Grid>
+        </Grid>
+
+        <!-- Status and buttons -->
+        <Grid Grid.Row="1" RowDefinitions="Auto,Auto" Margin="0,12,0,0">
+            <TextBlock x:Name="txtStatus" Grid.Row="0" FontSize="10"
+                       Foreground="Gray" Margin="0,0,0,8" />
+            <StackPanel Grid.Row="1" Orientation="Horizontal"
+                        HorizontalAlignment="Right" Spacing="8">
+                <Button Content="Select All" Click="CmdSelectAll_Click" />
+                <Button Content="Select None" Click="CmdSelectNone_Click" />
+                <Button x:Name="cmdOk" Content="OK" Width="80"
+                        Click="CmdOk_Click" />
+                <Button x:Name="cmdCancel" Content="Cancel" Width="80"
+                        Click="CmdCancel_Click" />
+            </StackPanel>
+        </Grid>
+    </Grid>
+</Window>

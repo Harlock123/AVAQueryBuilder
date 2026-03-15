@@ -1,0 +1,97 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:lawgrid="clr-namespace:LAWgrid;assembly=LAWgrid"
+        xmlns:syntax="clr-namespace:SyntaxColorizer.Controls;assembly=SyntaxColorizer"
+        xmlns:canvas="clr-namespace:AVASdCanvas.Controls;assembly=AVASdCanvas"
+        mc:Ignorable="d" d:DesignWidth="1000" d:DesignHeight="600"
+        x:Class="AVAQueryBuilder.MainWindow"
+        Title="AVA Query Builder"
+        Width="1000" Height="600">
+
+    <!-- Main horizontal split: Left (200px) | Right (800px) -->
+    <Grid ColumnDefinitions="200,Auto,*">
+
+        <!-- Left Region (200px) -->
+        <Border Grid.Column="0" BorderBrush="Gray" BorderThickness="0,0,1,0"
+                Padding="4">
+            <Grid RowDefinitions="*,Auto">
+                <StackPanel Grid.Row="0" Spacing="4">
+                    <Button x:Name="cmdConnectToData" Content="Connect to Data" HorizontalAlignment="Stretch" Click="CmdConnectToData_Click" />
+                    <Button x:Name="cmdAddTableSource" Content="Add Table Source" HorizontalAlignment="Stretch" Background="#90EE90" Foreground="Black" Click="CmdAddTableSource_Click" />
+                    <Button x:Name="cmdAddConnectedSource" Content="Add Connected Source" HorizontalAlignment="Stretch" Background="#D8B4FE" Foreground="Black" IsEnabled="False" Click="CmdAddConnectedSource_Click" />
+                    <Button x:Name="cmdAddLimiter" Content="Add Limiter" HorizontalAlignment="Stretch" Background="#FCA5A5" Foreground="Black" IsEnabled="False" Click="CmdAddLimiter_Click" />
+                    <Button x:Name="cmdAddFilter" Content="Add Filter" HorizontalAlignment="Stretch" IsEnabled="False" Click="CmdAddFilter_Click" />
+                </StackPanel>
+                <StackPanel Grid.Row="1" Spacing="4" Margin="0,8,0,0">
+                    <Separator />
+                    <Button x:Name="cmdSaveQuery" Content="Save Query" HorizontalAlignment="Stretch" Click="CmdSaveQuery_Click" />
+                    <Button x:Name="cmdLoadQuery" Content="Load Query" HorizontalAlignment="Stretch" Click="CmdLoadQuery_Click" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Splitter between left and right -->
+        <GridSplitter Grid.Column="1" Width="4" ResizeDirection="Columns"
+                      Background="DarkGray" />
+
+        <!-- Right Region -->
+        <Grid Grid.Column="2" RowDefinitions="60,Auto,*,Auto,*">
+
+            <!-- Top region (60px) -->
+            <Border Grid.Row="0" BorderBrush="Gray" BorderThickness="0,0,0,1"
+                    Padding="4">
+                <Grid ColumnDefinitions="3*,*" VerticalAlignment="Center">
+                    <StackPanel Grid.Column="0" Spacing="2">
+                        <TextBox x:Name="ConnectionStringTextBox" />
+                        <TextBlock Text="Connection String" FontSize="10" Foreground="Gray" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- Splitter between top and center -->
+            <GridSplitter Grid.Row="1" Height="4" ResizeDirection="Rows"
+                          Background="DarkGray" />
+
+            <!-- Center region - AVASdCanvas -->
+            <canvas:SdCanvas x:Name="QCanvas" Grid.Row="2" />
+
+            <!-- Splitter between center and bottom -->
+            <GridSplitter Grid.Row="3" Height="4" ResizeDirection="Rows"
+                          Background="DarkGray" />
+
+            <!-- Bottom region - TabControl with Execute button -->
+            <Grid Grid.Row="4" RowDefinitions="Auto,*">
+                <StackPanel Grid.Row="0" Orientation="Horizontal"
+                            HorizontalAlignment="Right" Margin="0,2,4,0">
+                    <Button x:Name="cmdExecuteQuery" Content="Execute Query"
+                            Background="#3B82F6" Foreground="White" FontSize="11"
+                            Padding="12,4" Click="CmdExecuteQuery_Click" />
+                </StackPanel>
+                <TabControl Grid.Row="1">
+                    <TabItem>
+                        <TabItem.Header>
+                            <TextBlock Text="Derived Query" FontSize="12" />
+                        </TabItem.Header>
+                        <syntax:SyntaxHighlightingTextBox x:Name="TheQuery"
+                                                           Background="#FFFDE8"
+                                                           Text="SELECT * FROM TABLENAME WHERE A=B Order By C"
+                                                           Language="MsSql"
+
+                                                           ShowLineNumbers="True"
+                                                           FontSize="14"
+                                                           />
+                    </TabItem>
+                    <TabItem x:Name="tabResultsGrid">
+                        <TabItem.Header>
+                            <TextBlock Text="Results Grid" FontSize="12" />
+                        </TabItem.Header>
+                        <lawgrid:LAWgrid x:Name="QResultsGrid" />
+                    </TabItem>
+                </TabControl>
+            </Grid>
+
+        </Grid>
+    </Grid>
+</Window>

@@ -1,0 +1,12 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="AVAQueryBuilder.UnderConstructionWindow"
+        Title="Notice"
+        Width="300" Height="150"
+        WindowStartupLocation="CenterOwner"
+        CanResize="False">
+    <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="16">
+        <TextBlock x:Name="MessageText" TextAlignment="Center" TextWrapping="Wrap" />
+        <Button Content="Close" HorizontalAlignment="Center" Click="CmdClose_Click" />
+    </StackPanel>
+</Window>

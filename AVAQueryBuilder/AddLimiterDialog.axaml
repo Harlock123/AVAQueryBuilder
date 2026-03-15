@@ -1,0 +1,25 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="AVAQueryBuilder.AddLimiterDialog"
+        Title="Add Limiter (TOP N)"
+        Width="300" Height="170"
+        WindowStartupLocation="CenterOwner"
+        CanResize="False">
+    <Grid Margin="16" RowDefinitions="Auto,Auto,Auto,*,Auto">
+        <TextBlock Grid.Row="0" Text="Limit results to top:" FontSize="12"
+                   Margin="0,0,0,4" />
+        <NumericUpDown x:Name="nudTopCount" Grid.Row="1"
+                       Minimum="1" Maximum="1000000" Value="100"
+                       Increment="10" FormatString="N0"
+                       HorizontalAlignment="Stretch" Margin="0,0,0,8" />
+        <TextBlock Grid.Row="2" Text="Adds a TOP N clause to the SELECT statement."
+                   FontSize="10" Foreground="Gray" Margin="0,0,0,8" />
+        <StackPanel Grid.Row="4" Orientation="Horizontal"
+                    HorizontalAlignment="Right" Spacing="8">
+            <Button x:Name="cmdOk" Content="OK" Width="80"
+                    Click="CmdOk_Click" />
+            <Button x:Name="cmdCancel" Content="Cancel" Width="80"
+                    Click="CmdCancel_Click" />
+        </StackPanel>
+    </Grid>
+</Window>

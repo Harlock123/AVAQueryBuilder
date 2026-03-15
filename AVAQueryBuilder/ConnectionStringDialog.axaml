@@ -1,0 +1,70 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="AVAQueryBuilder.ConnectionStringDialog"
+        Title="Connect to SQL Server"
+        Width="500" Height="420"
+        WindowStartupLocation="CenterOwner"
+        CanResize="False">
+    <Grid Margin="16" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,*,Auto">
+
+        <!-- Server -->
+        <TextBlock Grid.Row="0" Text="Server Name:" Margin="0,0,0,2" FontSize="12" />
+        <Grid Grid.Row="1" ColumnDefinitions="*,Auto" Margin="0,0,0,8">
+            <ComboBox x:Name="cboServer" Grid.Column="0" IsEditable="True"
+                      HorizontalAlignment="Stretch" />
+            <Button x:Name="cmdBrowseServers" Grid.Column="1" Content="Browse..."
+                    Margin="4,0,0,0" Click="CmdBrowseServers_Click" />
+        </Grid>
+
+        <!-- Authentication -->
+        <TextBlock Grid.Row="2" Text="Authentication:" Margin="0,0,0,2" FontSize="12" />
+        <ComboBox x:Name="cboAuth" Grid.Row="3" HorizontalAlignment="Stretch"
+                  Margin="0,0,0,8" SelectedIndex="0"
+                  SelectionChanged="CboAuth_SelectionChanged">
+            <ComboBoxItem Content="Windows Authentication" />
+            <ComboBoxItem Content="SQL Server Authentication" />
+        </ComboBox>
+
+        <!-- Username / Password -->
+        <Grid Grid.Row="4" ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto"
+              Margin="0,0,0,8">
+            <TextBlock Grid.Row="0" Grid.Column="0" Text="Username:"
+                       VerticalAlignment="Center" Margin="0,0,8,4" FontSize="12" />
+            <TextBox x:Name="txtUsername" Grid.Row="0" Grid.Column="1"
+                     IsEnabled="False" Margin="0,0,0,4" />
+            <TextBlock Grid.Row="1" Grid.Column="0" Text="Password:"
+                       VerticalAlignment="Center" Margin="0,0,8,0" FontSize="12" />
+            <TextBox x:Name="txtPassword" Grid.Row="1" Grid.Column="1"
+                     IsEnabled="False" PasswordChar="*" />
+        </Grid>
+
+        <!-- Database -->
+        <TextBlock Grid.Row="5" Text="Database:" Margin="0,0,0,2" FontSize="12" />
+        <Grid Grid.Row="6" ColumnDefinitions="*,Auto" Margin="0,0,0,12">
+            <ComboBox x:Name="cboDatabase" Grid.Column="0" IsEditable="True"
+                      HorizontalAlignment="Stretch" />
+            <Button x:Name="cmdRefreshDatabases" Grid.Column="1" Content="Refresh"
+                    Margin="4,0,0,0" Click="CmdRefreshDatabases_Click" />
+        </Grid>
+
+        <!-- Connection String result -->
+        <StackPanel Grid.Row="7" Spacing="2" VerticalAlignment="Top">
+            <TextBlock Text="Connection String (editable):" FontSize="12" />
+            <TextBox x:Name="txtConnectionString" AcceptsReturn="True"
+                     Height="60" TextWrapping="Wrap"
+                     TextChanged="TxtConnectionString_TextChanged" />
+            <TextBlock x:Name="txtStatus" FontSize="10" Foreground="Gray" />
+        </StackPanel>
+
+        <!-- OK / Cancel -->
+        <StackPanel Grid.Row="8" Orientation="Horizontal"
+                    HorizontalAlignment="Right" Spacing="8" Margin="0,12,0,0">
+            <Button x:Name="cmdTestConnection" Content="Test Connection"
+                    Click="CmdTestConnection_Click" />
+            <Button x:Name="cmdOk" Content="OK" Width="80"
+                    Click="CmdOk_Click" />
+            <Button x:Name="cmdCancel" Content="Cancel" Width="80"
+                    Click="CmdCancel_Click" />
+        </StackPanel>
+    </Grid>
+</Window>
