@@ -24,30 +24,54 @@ public partial class MainWindow : Window
     private static readonly SolidColorBrush TableFill = new(Color.Parse("#90EE90"));
     private static readonly SolidColorBrush LimiterFill = new(Color.Parse("#FCA5A5"));
     private static readonly SolidColorBrush LimiterStroke = new(Color.Parse("#DC2626"));
+    private static readonly SolidColorBrush FilterFill = new(Color.Parse("#93C5FD"));
+    private static readonly SolidColorBrush FilterStroke = new(Color.Parse("#2563EB"));
+    private static readonly SolidColorBrush SortingFill = new(Color.Parse("#FEF9C3"));
+    private static readonly SolidColorBrush SortingStroke = new(Color.Parse("#CA8A04"));
 
     public MainWindow()
     {
         InitializeComponent();
         TheQuery.SyntaxTheme = BuiltInThemes.GitHubLight;
         QCanvas.ElementDoubleClick += QCanvas_ElementDoubleClick;
+        QCanvas.ElementRightClick += QCanvas_ElementRightClick;
     }
 
-    private async void QCanvas_ElementDoubleClick(object? sender, CanvasElementEventArgs e)
+    private void QCanvas_ElementRightClick(object? sender, CanvasElementEventArgs e)
     {
-        if (e.Entity?.Metadata is TableSourceResult existingTable)
+        if (e.Entity == null) return;
+
+        var entity = e.Entity;
+        var contextMenu = new ContextMenu();
+
+        var editItem = new MenuItem { Header = "Edit" };
+        editItem.Click += (_, _) => EditEntity(entity);
+
+        var deleteItem = new MenuItem { Header = "Delete" };
+        deleteItem.Click += (_, _) => DeleteEntity(entity);
+
+        contextMenu.Items.Add(editItem);
+        contextMenu.Items.Add(deleteItem);
+
+        contextMenu.Open(QCanvas);
+    }
+
+    private async void EditEntity(GraphicEntity entity)
+    {
+        if (entity.Metadata is TableSourceResult existingTable)
         {
             var dialog = new AddTableSourceDialog { ExistingResult = existingTable };
             var result = await dialog.ShowDialog<bool?>(this);
             if (result == true && dialog.Result != null)
             {
                 var r = dialog.Result;
-                e.Entity.Metadata = null;
-                e.Entity.Label = r.TableName;
-                e.Entity.Metadata = r;
+                entity.Metadata = null;
+                entity.Label = r.TableName;
+                entity.Metadata = r;
                 RebuildQuery();
             }
         }
-        else if (e.Entity?.Metadata is ConnectedSourceResult existingLookup)
+        else if (entity.Metadata is ConnectedSourceResult existingLookup)
         {
             var sourceEntity = FindSourceTableEntity(existingLookup.SourceTableName);
             if (sourceEntity?.Metadata is not TableSourceResult sourceTable) return;
@@ -62,24 +86,160 @@ public partial class MainWindow : Window
             if (result == true && dialog.Result != null)
             {
                 var r = dialog.Result;
-                e.Entity.Metadata = null;
-                e.Entity.Label = r.LookupTableName;
-                e.Entity.Metadata = r;
+                entity.Metadata = null;
+                entity.Label = r.LookupTableName;
+                entity.Metadata = r;
                 RebuildQuery();
             }
         }
-        else if (e.Entity?.Metadata is LimiterResult existingLimiter)
+        else if (entity.Metadata is LimiterResult existingLimiter)
         {
             var dialog = new AddLimiterDialog { ExistingTopCount = existingLimiter.TopCount };
             var result = await dialog.ShowDialog<bool?>(this);
             if (result == true && dialog.Result != null)
             {
-                e.Entity.Metadata = null;
-                e.Entity.Label = $"TOP {dialog.Result.TopCount}";
-                e.Entity.Metadata = dialog.Result;
+                entity.Metadata = null;
+                entity.Label = $"TOP {dialog.Result.TopCount}";
+                entity.Metadata = dialog.Result;
                 RebuildQuery();
             }
         }
+        else if (entity.Metadata is FilterResult existingFilter)
+        {
+            var tableEntity = QCanvas.Entities.FirstOrDefault(ent => ent.Metadata is TableSourceResult);
+            if (tableEntity?.Metadata is not TableSourceResult sourceTable) return;
+
+            var lookups = QCanvas.Entities
+                .Where(ent => ent.Metadata is ConnectedSourceResult)
+                .Select(ent => (ConnectedSourceResult)ent.Metadata!)
+                .OrderBy(l => l.OrdinalValue)
+                .ToList();
+
+            var dialog = new AddFilterDialog
+            {
+                SourceTable = sourceTable,
+                Lookups = lookups,
+                ExistingResult = existingFilter
+            };
+            var result = await dialog.ShowDialog<bool?>(this);
+            if (result == true && dialog.Result != null)
+            {
+                entity.Metadata = null;
+                entity.Label = $"WHERE ({dialog.Result.Conditions.Count})";
+                entity.Metadata = dialog.Result;
+                RebuildQuery();
+            }
+        }
+        else if (entity.Metadata is SortingResult existingSorting)
+        {
+            var tableEntity = QCanvas.Entities.FirstOrDefault(ent => ent.Metadata is TableSourceResult);
+            if (tableEntity?.Metadata is not TableSourceResult sourceTable) return;
+
+            var lookups = QCanvas.Entities
+                .Where(ent => ent.Metadata is ConnectedSourceResult)
+                .Select(ent => (ConnectedSourceResult)ent.Metadata!)
+                .OrderBy(l => l.OrdinalValue)
+                .ToList();
+
+            var dialog = new AddSortingDialog
+            {
+                SourceTable = sourceTable,
+                Lookups = lookups,
+                ExistingResult = existingSorting
+            };
+            var result = await dialog.ShowDialog<bool?>(this);
+            if (result == true && dialog.Result != null)
+            {
+                entity.Metadata = null;
+                entity.Label = $"ORDER BY ({dialog.Result.Fields.Count})";
+                entity.Metadata = dialog.Result;
+                RebuildQuery();
+            }
+        }
+    }
+
+    private async void DeleteEntity(GraphicEntity entity)
+    {
+        var entityType = entity.Metadata switch
+        {
+            TableSourceResult => "Table Source",
+            ConnectedSourceResult => "Connected Source",
+            LimiterResult => "Limiter",
+            FilterResult => "Filter",
+            SortingResult => "Sorting",
+            _ => "Entity"
+        };
+
+        var isTable = entity.Metadata is TableSourceResult;
+        var message = isTable
+            ? $"Delete the {entityType}? This will remove ALL entities from the canvas."
+            : $"Delete the {entityType} \"{entity.Label}\"?";
+
+        var dialog = new Window
+        {
+            Title = "Confirm Delete",
+            Width = 350,
+            Height = 150,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            CanResize = false
+        };
+
+        var result = false;
+
+        var yesButton = new Button { Content = "Yes", Width = 80 };
+        yesButton.Click += (_, _) => { result = true; dialog.Close(); };
+
+        var noButton = new Button { Content = "No", Width = 80 };
+        noButton.Click += (_, _) => { dialog.Close(); };
+
+        dialog.Content = new StackPanel
+        {
+            Margin = new Avalonia.Thickness(16),
+            Spacing = 16,
+            Children =
+            {
+                new TextBlock { Text = message, TextWrapping = TextWrapping.Wrap },
+                new StackPanel
+                {
+                    Orientation = Avalonia.Layout.Orientation.Horizontal,
+                    HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right,
+                    Spacing = 8,
+                    Children = { yesButton, noButton }
+                }
+            }
+        };
+
+        await dialog.ShowDialog(this);
+
+        if (!result) return;
+
+        if (isTable)
+        {
+            // Remove all entities and connectors
+            QCanvas.Clear();
+            _lookupOrdinal = 0;
+            TheQuery.Text = string.Empty;
+            UpdateConnectedSourceButtonState();
+        }
+        else
+        {
+            // Remove connectors attached to this entity
+            var connectors = QCanvas.Connectors
+                .Where(c => c.SourceEntityId == entity.Id || c.TargetEntityId == entity.Id)
+                .ToList();
+            foreach (var c in connectors)
+                QCanvas.RemoveConnector(c);
+
+            QCanvas.RemoveEntity(entity);
+            RebuildQuery();
+            UpdateConnectedSourceButtonState();
+        }
+    }
+
+    private void QCanvas_ElementDoubleClick(object? sender, CanvasElementEventArgs e)
+    {
+        if (e.Entity != null)
+            EditEntity(e.Entity);
     }
 
     private GraphicEntity? FindSourceTableEntity(string tableName)
@@ -99,6 +259,7 @@ public partial class MainWindow : Window
         cmdAddConnectedSource.IsEnabled = hasTable;
         cmdAddLimiter.IsEnabled = hasTable;
         cmdAddFilter.IsEnabled = hasTable;
+        cmdAddSorting.IsEnabled = hasTable;
     }
 
     private void ShowUnderConstruction(string functionName)
@@ -288,9 +449,146 @@ public partial class MainWindow : Window
         }
     }
 
-    private void CmdAddFilter_Click(object? sender, RoutedEventArgs e)
+    private async void CmdAddFilter_Click(object? sender, RoutedEventArgs e)
     {
-        ShowUnderConstruction("Add Filter");
+        var tableEntity = QCanvas.Entities.FirstOrDefault(ent => ent.Metadata is TableSourceResult);
+        if (tableEntity?.Metadata is not TableSourceResult sourceTable)
+        {
+            ShowUnderConstruction("Add a Table Source first");
+            return;
+        }
+
+        var lookups = QCanvas.Entities
+            .Where(ent => ent.Metadata is ConnectedSourceResult)
+            .Select(ent => (ConnectedSourceResult)ent.Metadata!)
+            .OrderBy(l => l.OrdinalValue)
+            .ToList();
+
+        var dialog = new AddFilterDialog
+        {
+            SourceTable = sourceTable,
+            Lookups = lookups
+        };
+
+        // Pre-populate if filter already exists
+        var existingFilterEntity = QCanvas.Entities.FirstOrDefault(ent => ent.Metadata is FilterResult);
+        if (existingFilterEntity?.Metadata is FilterResult existing)
+            dialog.ExistingResult = existing;
+
+        var result = await dialog.ShowDialog<bool?>(this);
+        if (result == true && dialog.Result != null)
+        {
+            // Remove existing filter and its connectors
+            var oldFilter = QCanvas.Entities.FirstOrDefault(ent => ent.Metadata is FilterResult);
+            if (oldFilter != null)
+            {
+                var oldConnectors = QCanvas.Connectors
+                    .Where(c => c.SourceEntityId == oldFilter.Id || c.TargetEntityId == oldFilter.Id)
+                    .ToList();
+                foreach (var c in oldConnectors)
+                    QCanvas.RemoveConnector(c);
+                QCanvas.RemoveEntity(oldFilter);
+            }
+
+            // Position: next slot after lookups and limiter
+            var rightSideCount = QCanvas.Entities
+                .Count(ent => ent.Metadata is ConnectedSourceResult or LimiterResult);
+            var xPos = tableEntity.X + tableEntity.Width + 60;
+            var yPos = tableEntity.Y + (rightSideCount * 55);
+
+            var filterEntity = QCanvas.AddEntity(
+                label: $"WHERE ({dialog.Result.Conditions.Count})",
+                x: xPos,
+                y: yPos,
+                width: 160,
+                height: 40,
+                fill: FilterFill,
+                stroke: FilterStroke,
+                metadata: dialog.Result
+            );
+
+            QCanvas.AddConnector(
+                source: tableEntity,
+                target: filterEntity,
+                sourceEndpoint: EndpointStyle.RoundDot,
+                targetEndpoint: EndpointStyle.PointedArrow,
+                lineBrush: Brushes.Blue,
+                metadata: null
+            );
+
+            RebuildQuery();
+        }
+    }
+
+    private async void CmdAddSorting_Click(object? sender, RoutedEventArgs e)
+    {
+        var tableEntity = QCanvas.Entities.FirstOrDefault(ent => ent.Metadata is TableSourceResult);
+        if (tableEntity?.Metadata is not TableSourceResult sourceTable)
+        {
+            ShowUnderConstruction("Add a Table Source first");
+            return;
+        }
+
+        var lookups = QCanvas.Entities
+            .Where(ent => ent.Metadata is ConnectedSourceResult)
+            .Select(ent => (ConnectedSourceResult)ent.Metadata!)
+            .OrderBy(l => l.OrdinalValue)
+            .ToList();
+
+        var dialog = new AddSortingDialog
+        {
+            SourceTable = sourceTable,
+            Lookups = lookups
+        };
+
+        // Pre-populate if sorting already exists
+        var existingSortingEntity = QCanvas.Entities.FirstOrDefault(ent => ent.Metadata is SortingResult);
+        if (existingSortingEntity?.Metadata is SortingResult existing)
+            dialog.ExistingResult = existing;
+
+        var result = await dialog.ShowDialog<bool?>(this);
+        if (result == true && dialog.Result != null)
+        {
+            // Remove existing sorting and its connectors
+            var oldSorting = QCanvas.Entities.FirstOrDefault(ent => ent.Metadata is SortingResult);
+            if (oldSorting != null)
+            {
+                var oldConnectors = QCanvas.Connectors
+                    .Where(c => c.SourceEntityId == oldSorting.Id || c.TargetEntityId == oldSorting.Id)
+                    .ToList();
+                foreach (var c in oldConnectors)
+                    QCanvas.RemoveConnector(c);
+                QCanvas.RemoveEntity(oldSorting);
+            }
+
+            // Position: next slot after lookups, limiter, and filter
+            var rightSideCount = QCanvas.Entities
+                .Count(ent => ent.Metadata is ConnectedSourceResult or LimiterResult or FilterResult);
+            var xPos = tableEntity.X + tableEntity.Width + 60;
+            var yPos = tableEntity.Y + (rightSideCount * 55);
+
+            var sortingEntity = QCanvas.AddEntity(
+                label: $"ORDER BY ({dialog.Result.Fields.Count})",
+                x: xPos,
+                y: yPos,
+                width: 160,
+                height: 40,
+                fill: SortingFill,
+                stroke: SortingStroke,
+                metadata: dialog.Result
+            );
+
+            QCanvas.AddConnector(
+                source: tableEntity,
+                target: sortingEntity,
+                sourceEndpoint: EndpointStyle.RoundDot,
+                targetEndpoint: EndpointStyle.PointedArrow,
+                lineBrush: Brushes.Goldenrod,
+                metadata: null
+            );
+
+            RebuildQuery();
+        }
     }
 
     private async void CmdSaveQuery_Click(object? sender, RoutedEventArgs e)
@@ -343,6 +641,16 @@ public partial class MainWindow : Window
                 {
                     state.EntityType = "Limiter";
                     state.Limiter = lr;
+                }
+                else if (entity.Metadata is FilterResult fr)
+                {
+                    state.EntityType = "Filter";
+                    state.Filter = fr;
+                }
+                else if (entity.Metadata is SortingResult sr)
+                {
+                    state.EntityType = "Sorting";
+                    state.Sorting = sr;
                 }
 
                 queryFile.Entities.Add(state);
@@ -441,6 +749,22 @@ public partial class MainWindow : Window
                             metadata: es.Limiter!
                         );
                         break;
+                    case "Filter":
+                        newEntity = QCanvas.AddEntity(
+                            label: es.Label, x: es.X, y: es.Y,
+                            width: es.Width, height: es.Height,
+                            fill: FilterFill, stroke: FilterStroke,
+                            metadata: es.Filter!
+                        );
+                        break;
+                    case "Sorting":
+                        newEntity = QCanvas.AddEntity(
+                            label: es.Label, x: es.X, y: es.Y,
+                            width: es.Width, height: es.Height,
+                            fill: SortingFill, stroke: SortingStroke,
+                            metadata: es.Sorting!
+                        );
+                        break;
                 }
 
                 if (newEntity != null)
@@ -458,9 +782,15 @@ public partial class MainWindow : Window
                 var targetEp = Enum.TryParse<EndpointStyle>(cs.TargetEndpoint, out var tep) ? tep : EndpointStyle.PointedArrow;
 
                 // Determine line color from entity types
-                var lineBrush = source.Metadata is LimiterResult || target.Metadata is LimiterResult
-                    ? Brushes.Red
-                    : (IBrush)Brushes.Purple;
+                IBrush lineBrush;
+                if (source.Metadata is LimiterResult || target.Metadata is LimiterResult)
+                    lineBrush = Brushes.Red;
+                else if (source.Metadata is FilterResult || target.Metadata is FilterResult)
+                    lineBrush = Brushes.Blue;
+                else if (source.Metadata is SortingResult || target.Metadata is SortingResult)
+                    lineBrush = Brushes.Goldenrod;
+                else
+                    lineBrush = Brushes.Purple;
 
                 QCanvas.AddConnector(source, target, sourceEp, targetEp, lineBrush, null);
             }

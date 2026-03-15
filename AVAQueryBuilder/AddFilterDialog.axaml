@@ -1,0 +1,96 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:AVAQueryBuilder"
+        x:Class="AVAQueryBuilder.AddFilterDialog"
+        Title="Add Filter (WHERE Clause)"
+        Width="880" Height="450"
+        WindowStartupLocation="CenterOwner"
+        CanResize="True" MinWidth="600" MinHeight="300">
+    <Grid Margin="16" RowDefinitions="Auto,Auto,*,Auto,Auto,Auto">
+
+        <!-- Combiner selection -->
+        <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="8" Margin="0,0,0,8">
+            <TextBlock Text="Combine conditions with:" VerticalAlignment="Center"
+                       FontSize="12" />
+            <ComboBox x:Name="cboCombiner" SelectedIndex="0" Width="80">
+                <ComboBoxItem Content="AND" />
+                <ComboBoxItem Content="OR" />
+            </ComboBox>
+        </StackPanel>
+
+        <!-- Column headers -->
+        <Grid Grid.Row="1" ColumnDefinitions="2*,Auto,Auto,2*,2*,30"
+              Margin="0,0,0,4">
+            <TextBlock Grid.Column="0" Text="Field" FontWeight="SemiBold"
+                       FontSize="11" Margin="0,0,4,0" />
+            <TextBlock Grid.Column="1" Text="CAST as" FontWeight="SemiBold"
+                       FontSize="11" Margin="4,0,4,0" />
+            <TextBlock Grid.Column="2" Text="Operator" FontWeight="SemiBold"
+                       FontSize="11" Margin="4,0,4,0" />
+            <TextBlock Grid.Column="3" Text="Value" FontWeight="SemiBold"
+                       FontSize="11" Margin="4,0,4,0" />
+            <TextBlock Grid.Column="4" Text="Value 2 (BETWEEN)" FontWeight="SemiBold"
+                       FontSize="11" Margin="4,0,4,0" />
+        </Grid>
+
+        <!-- Condition rows -->
+        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
+            <ItemsControl x:Name="conditionsList">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="local:FilterConditionViewModel">
+                        <Grid ColumnDefinitions="2*,Auto,Auto,2*,2*,30"
+                              Margin="0,2,0,2">
+                            <ComboBox Grid.Column="0" ItemsSource="{Binding AvailableFields}"
+                                      SelectedItem="{Binding SelectedField}"
+                                      HorizontalAlignment="Stretch" Margin="0,0,4,0"
+                                      IsEditable="False" />
+                            <ComboBox Grid.Column="1"
+                                      ItemsSource="{x:Static local:FilterConditionViewModel.CastTypes}"
+                                      SelectedItem="{Binding SelectedCastAs}"
+                                      Margin="4,0,4,0" Width="100" />
+                            <ComboBox Grid.Column="2"
+                                      ItemsSource="{x:Static local:FilterConditionViewModel.Operators}"
+                                      SelectedItem="{Binding SelectedOperator}"
+                                      Margin="4,0,4,0" Width="120" />
+                            <TextBox Grid.Column="3" Text="{Binding Value}"
+                                     IsVisible="{Binding ShowValue}"
+                                     HorizontalAlignment="Stretch" Margin="4,0,4,0" />
+                            <TextBox Grid.Column="4" Text="{Binding Value2}"
+                                     IsVisible="{Binding ShowValue2}"
+                                     HorizontalAlignment="Stretch" Margin="4,0,4,0" />
+                            <Button Grid.Column="5" Content="X" Width="26" Height="26"
+                                    FontSize="10" Padding="0"
+                                    HorizontalContentAlignment="Center"
+                                    VerticalContentAlignment="Center"
+                                    Tag="{Binding}"
+                                    Click="CmdRemoveCondition_Click" />
+                        </Grid>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+
+        <!-- Add condition button -->
+        <Button Grid.Row="3" Content="+ Add Condition" Margin="0,8,0,8"
+                HorizontalAlignment="Left" Click="CmdAddCondition_Click" />
+
+        <!-- Preview -->
+        <StackPanel Grid.Row="4" Spacing="2" Margin="0,0,0,8">
+            <TextBlock Text="Preview:" FontSize="10" Foreground="Gray" />
+            <TextBlock x:Name="txtPreview" FontSize="11" FontFamily="Consolas"
+                       TextWrapping="Wrap" Foreground="DarkBlue" />
+        </StackPanel>
+
+        <!-- Status and buttons -->
+        <Grid Grid.Row="5" ColumnDefinitions="*,Auto">
+            <TextBlock x:Name="txtStatus" Grid.Column="0" FontSize="10"
+                       Foreground="Gray" VerticalAlignment="Center" />
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                <Button x:Name="cmdOk" Content="OK" Width="80"
+                        Click="CmdOk_Click" />
+                <Button x:Name="cmdCancel" Content="Cancel" Width="80"
+                        Click="CmdCancel_Click" />
+            </StackPanel>
+        </Grid>
+    </Grid>
+</Window>

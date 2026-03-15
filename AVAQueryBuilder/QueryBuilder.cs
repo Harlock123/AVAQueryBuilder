@@ -27,6 +27,16 @@ public static class QueryBuilder
             .Select(e => (LimiterResult)e.Metadata!)
             .FirstOrDefault();
 
+        var filter = entityList
+            .Where(e => e.Metadata is FilterResult)
+            .Select(e => (FilterResult)e.Metadata!)
+            .FirstOrDefault();
+
+        var sorting = entityList
+            .Where(e => e.Metadata is SortingResult)
+            .Select(e => (SortingResult)e.Metadata!)
+            .FirstOrDefault();
+
         if (tableSources.Count == 0)
             return string.Empty;
 
@@ -66,7 +76,7 @@ public static class QueryBuilder
             var alias = $"LOOKUP_{lookup.OrdinalValue}";
             sb.AppendLine();
             sb.Append($"LEFT JOIN {lookup.LookupTableName} AS {alias}");
-            sb.Append($" ON ");
+            sb.Append(" ON ");
 
             var joinConditions = lookup.JoinFieldsFromSource
                 .Select(sf => $"{lookup.SourceTableName}.{sf} = {alias}.{lookup.JoinFieldInLookup}")
@@ -74,6 +84,67 @@ public static class QueryBuilder
             sb.Append(string.Join(" AND ", joinConditions));
         }
 
+        // WHERE clause
+        if (filter != null && filter.Conditions.Count > 0)
+        {
+            sb.AppendLine();
+            sb.Append("WHERE ");
+
+            var whereParts = new List<string>();
+            foreach (var c in filter.Conditions)
+            {
+                var clause = FormatCondition(c);
+                if (clause != null)
+                    whereParts.Add(clause);
+            }
+
+            sb.Append(string.Join($" {filter.Combiner} ", whereParts));
+        }
+
+        // ORDER BY clause
+        if (sorting != null && sorting.Fields.Count > 0)
+        {
+            sb.AppendLine();
+            sb.Append("ORDER BY ");
+            var orderParts = sorting.Fields
+                .Where(f => !string.IsNullOrWhiteSpace(f.Field))
+                .Select(f => $"{f.Field} {f.Direction}");
+            sb.Append(string.Join(", ", orderParts));
+        }
+
         return sb.ToString();
+    }
+
+    private static string? FormatCondition(FilterCondition c)
+    {
+        var field = c.Field;
+        if (string.IsNullOrWhiteSpace(field)) return null;
+
+        var castAs = c.CastAs;
+        if (!string.IsNullOrWhiteSpace(castAs) && castAs != "(none)")
+        {
+            var castType = castAs == "VARCHAR" ? "VARCHAR(MAX)" : castAs;
+            field = $"CAST({field} AS {castType})";
+        }
+
+        return c.Operator switch
+        {
+            "IS NULL" => $"{field} IS NULL",
+            "IS NOT NULL" => $"{field} IS NOT NULL",
+            "IS EMPTY" => $"{field} = ''",
+            "IS NOT EMPTY" => $"{field} != ''",
+            "BETWEEN" => $"{field} BETWEEN '{c.Value}' AND '{c.Value2}'",
+            "IN" => $"{field} IN ({FormatInValues(c.Value)})",
+            "NOT IN" => $"{field} NOT IN ({FormatInValues(c.Value)})",
+            "LIKE" => $"{field} LIKE '{c.Value}'",
+            "NOT LIKE" => $"{field} NOT LIKE '{c.Value}'",
+            _ => $"{field} {c.Operator} '{c.Value}'"
+        };
+    }
+
+    private static string FormatInValues(string value)
+    {
+        var items = value.Split(',').Select(v => $"'{v.Trim()}'");
+        return string.Join(", ", items);
     }
 }

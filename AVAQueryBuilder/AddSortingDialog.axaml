@@ -1,0 +1,70 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:AVAQueryBuilder"
+        x:Class="AVAQueryBuilder.AddSortingDialog"
+        Title="Add Sorting (ORDER BY)"
+        Width="600" Height="400"
+        WindowStartupLocation="CenterOwner"
+        CanResize="True" MinWidth="450" MinHeight="250">
+    <Grid Margin="16" RowDefinitions="Auto,Auto,*,Auto,Auto,Auto">
+
+        <!-- Column headers -->
+        <Grid Grid.Row="0" ColumnDefinitions="3*,Auto,30"
+              Margin="0,0,0,4">
+            <TextBlock Grid.Column="0" Text="Field" FontWeight="SemiBold"
+                       FontSize="11" Margin="0,0,4,0" />
+            <TextBlock Grid.Column="1" Text="Direction" FontWeight="SemiBold"
+                       FontSize="11" Margin="4,0,4,0" />
+        </Grid>
+
+        <!-- Sorting rows -->
+        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
+            <ItemsControl x:Name="sortingList">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="local:SortingFieldViewModel">
+                        <Grid ColumnDefinitions="3*,Auto,30"
+                              Margin="0,2,0,2">
+                            <ComboBox Grid.Column="0" ItemsSource="{Binding AvailableFields}"
+                                      SelectedItem="{Binding SelectedField}"
+                                      HorizontalAlignment="Stretch" Margin="0,0,4,0"
+                                      IsEditable="False" />
+                            <ComboBox Grid.Column="1"
+                                      ItemsSource="{x:Static local:SortingFieldViewModel.Directions}"
+                                      SelectedItem="{Binding SelectedDirection}"
+                                      Margin="4,0,4,0" Width="80" />
+                            <Button Grid.Column="2" Content="X" Width="26" Height="26"
+                                    FontSize="10" Padding="0"
+                                    HorizontalContentAlignment="Center"
+                                    VerticalContentAlignment="Center"
+                                    Tag="{Binding}"
+                                    Click="CmdRemoveSortField_Click" />
+                        </Grid>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+
+        <!-- Add sort field button -->
+        <Button Grid.Row="3" Content="+ Add Sort Field" Margin="0,8,0,8"
+                HorizontalAlignment="Left" Click="CmdAddSortField_Click" />
+
+        <!-- Preview -->
+        <StackPanel Grid.Row="4" Spacing="2" Margin="0,0,0,8">
+            <TextBlock Text="Preview:" FontSize="10" Foreground="Gray" />
+            <TextBlock x:Name="txtPreview" FontSize="11" FontFamily="Consolas"
+                       TextWrapping="Wrap" Foreground="DarkBlue" />
+        </StackPanel>
+
+        <!-- Status and buttons -->
+        <Grid Grid.Row="5" ColumnDefinitions="*,Auto">
+            <TextBlock x:Name="txtStatus" Grid.Column="0" FontSize="10"
+                       Foreground="Gray" VerticalAlignment="Center" />
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                <Button x:Name="cmdOk" Content="OK" Width="80"
+                        Click="CmdOk_Click" />
+                <Button x:Name="cmdCancel" Content="Cancel" Width="80"
+                        Click="CmdCancel_Click" />
+            </StackPanel>
+        </Grid>
+    </Grid>
+</Window>

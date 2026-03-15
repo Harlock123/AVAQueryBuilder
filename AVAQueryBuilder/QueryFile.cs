@@ -19,7 +19,7 @@ public class EntityState
     public double Y { get; set; }
     public double Width { get; set; }
     public double Height { get; set; }
-    public string EntityType { get; set; } = string.Empty; // "Table", "Lookup", "Limiter"
+    public string EntityType { get; set; } = string.Empty; // "Table", "Lookup", "Limiter", "Filter"
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public TableSourceResult? TableSource { get; set; }
@@ -29,6 +29,12 @@ public class EntityState
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public LimiterResult? Limiter { get; set; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public FilterResult? Filter { get; set; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public SortingResult? Sorting { get; set; }
 }
 
 public class ConnectorState
