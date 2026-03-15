@@ -7,6 +7,8 @@ namespace AVAQueryBuilder;
 
 public static class QueryBuilder
 {
+    private const int MaxLineWidth = 80;
+
     public static string BuildQuery(IEnumerable<GraphicEntity> entities)
     {
         var entityList = entities.ToList();
@@ -64,11 +66,12 @@ public static class QueryBuilder
             allColumns.AddRange(lookup.ReturnFields.Select(col => $"{alias}.{col}"));
         }
 
-        sb.AppendLine(string.Join(", ", allColumns));
+        AppendWrappedList(sb, allColumns, "       ");
+        sb.AppendLine();
 
         // FROM clause
         sb.Append("FROM ");
-        sb.Append(string.Join(", ", tableSources.Select(t => t.TableName)));
+        AppendWrappedList(sb, tableSources.Select(t => t.TableName).ToList(), "     ");
 
         // JOIN clauses for lookups
         foreach (var lookup in lookups)
@@ -98,7 +101,8 @@ public static class QueryBuilder
                     whereParts.Add(clause);
             }
 
-            sb.Append(string.Join($" {filter.Combiner} ", whereParts));
+            var combiner = $" {filter.Combiner} ";
+            AppendWrappedList(sb, whereParts, "      ", combiner);
         }
 
         // ORDER BY clause
@@ -108,8 +112,9 @@ public static class QueryBuilder
             sb.Append("ORDER BY ");
             var orderParts = sorting.Fields
                 .Where(f => !string.IsNullOrWhiteSpace(f.Field))
-                .Select(f => $"{f.Field} {f.Direction}");
-            sb.Append(string.Join(", ", orderParts));
+                .Select(f => $"{f.Field} {f.Direction}")
+                .ToList();
+            AppendWrappedList(sb, orderParts, "         ");
         }
 
         return sb.ToString();
@@ -140,6 +145,30 @@ public static class QueryBuilder
             "NOT LIKE" => $"{field} NOT LIKE '{c.Value}'",
             _ => $"{field} {c.Operator} '{c.Value}'"
         };
+    }
+
+    private static void AppendWrappedList(StringBuilder sb, List<string> items, string indent, string separator = ", ")
+    {
+        if (items.Count == 0) return;
+
+        var lineLength = sb.Length - sb.ToString().LastIndexOf('\n') - 1;
+
+        for (var i = 0; i < items.Count; i++)
+        {
+            var item = items[i];
+            var sep = i < items.Count - 1 ? separator : "";
+            var chunk = item + sep;
+
+            if (i > 0 && lineLength + chunk.Length > MaxLineWidth)
+            {
+                sb.AppendLine();
+                sb.Append(indent);
+                lineLength = indent.Length;
+            }
+
+            sb.Append(chunk);
+            lineLength += chunk.Length;
+        }
     }
 
     private static string FormatInValues(string value)
