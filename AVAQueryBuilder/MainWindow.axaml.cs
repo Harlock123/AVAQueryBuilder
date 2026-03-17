@@ -28,6 +28,8 @@ public partial class MainWindow : Window
     private static readonly SolidColorBrush FilterStroke = new(Color.Parse("#2563EB"));
     private static readonly SolidColorBrush SortingFill = new(Color.Parse("#FEF9C3"));
     private static readonly SolidColorBrush SortingStroke = new(Color.Parse("#CA8A04"));
+    private static readonly SolidColorBrush DerivedFill = new(Color.Parse("#A8E0CC"));
+    private static readonly SolidColorBrush DerivedStroke = new(Color.Parse("#2D8B70"));
 
     public MainWindow()
     {
@@ -156,6 +158,32 @@ public partial class MainWindow : Window
                 RebuildQuery();
             }
         }
+        else if (entity.Metadata is DerivedFieldResult existingDerived)
+        {
+            var tableEntity = QCanvas.Entities.FirstOrDefault(ent => ent.Metadata is TableSourceResult);
+            if (tableEntity?.Metadata is not TableSourceResult sourceTable) return;
+
+            var lookups = QCanvas.Entities
+                .Where(ent => ent.Metadata is ConnectedSourceResult)
+                .Select(ent => (ConnectedSourceResult)ent.Metadata!)
+                .OrderBy(l => l.OrdinalValue)
+                .ToList();
+
+            var dialog = new AddDerivedDialog
+            {
+                SourceTable = sourceTable,
+                Lookups = lookups,
+                ExistingResult = existingDerived
+            };
+            var result = await dialog.ShowDialog<bool?>(this);
+            if (result == true && dialog.Result != null)
+            {
+                entity.Metadata = null;
+                entity.Label = $"DERIVED ({dialog.Result.Fields.Count})";
+                entity.Metadata = dialog.Result;
+                RebuildQuery();
+            }
+        }
     }
 
     private async void DeleteEntity(GraphicEntity entity)
@@ -167,6 +195,7 @@ public partial class MainWindow : Window
             LimiterResult => "Limiter",
             FilterResult => "Filter",
             SortingResult => "Sorting",
+            DerivedFieldResult => "Derived Field",
             _ => "Entity"
         };
 
@@ -257,6 +286,7 @@ public partial class MainWindow : Window
     {
         var hasTable = QCanvas.Entities.Any(e => e.Metadata is TableSourceResult);
         cmdAddConnectedSource.IsEnabled = hasTable;
+        cmdAddDerived.IsEnabled = hasTable;
         cmdAddLimiter.IsEnabled = hasTable;
         cmdAddFilter.IsEnabled = hasTable;
         cmdAddSorting.IsEnabled = hasTable;
@@ -302,6 +332,77 @@ public partial class MainWindow : Window
             );
             RebuildQuery();
             UpdateConnectedSourceButtonState();
+        }
+    }
+
+    private async void CmdAddDerived_Click(object? sender, RoutedEventArgs e)
+    {
+        var tableEntity = QCanvas.Entities.FirstOrDefault(ent => ent.Metadata is TableSourceResult);
+        if (tableEntity?.Metadata is not TableSourceResult sourceTable)
+        {
+            ShowUnderConstruction("Add a Table Source first");
+            return;
+        }
+
+        var lookups = QCanvas.Entities
+            .Where(ent => ent.Metadata is ConnectedSourceResult)
+            .Select(ent => (ConnectedSourceResult)ent.Metadata!)
+            .OrderBy(l => l.OrdinalValue)
+            .ToList();
+
+        var dialog = new AddDerivedDialog
+        {
+            SourceTable = sourceTable,
+            Lookups = lookups
+        };
+
+        // Pre-populate if derived already exists
+        var existingDerivedEntity = QCanvas.Entities.FirstOrDefault(ent => ent.Metadata is DerivedFieldResult);
+        if (existingDerivedEntity?.Metadata is DerivedFieldResult existing)
+            dialog.ExistingResult = existing;
+
+        var result = await dialog.ShowDialog<bool?>(this);
+        if (result == true && dialog.Result != null)
+        {
+            // Remove existing derived and its connectors
+            var oldDerived = QCanvas.Entities.FirstOrDefault(ent => ent.Metadata is DerivedFieldResult);
+            if (oldDerived != null)
+            {
+                var oldConnectors = QCanvas.Connectors
+                    .Where(c => c.SourceEntityId == oldDerived.Id || c.TargetEntityId == oldDerived.Id)
+                    .ToList();
+                foreach (var c in oldConnectors)
+                    QCanvas.RemoveConnector(c);
+                QCanvas.RemoveEntity(oldDerived);
+            }
+
+            // Position: next slot after lookups, limiter, filter, sorting
+            var rightSideCount = QCanvas.Entities
+                .Count(ent => ent.Metadata is ConnectedSourceResult or LimiterResult or FilterResult or SortingResult);
+            var xPos = tableEntity.X + tableEntity.Width + 60;
+            var yPos = tableEntity.Y + (rightSideCount * 55);
+
+            var derivedEntity = QCanvas.AddEntity(
+                label: $"DERIVED ({dialog.Result.Fields.Count})",
+                x: xPos,
+                y: yPos,
+                width: 160,
+                height: 40,
+                fill: DerivedFill,
+                stroke: DerivedStroke,
+                metadata: dialog.Result
+            );
+
+            QCanvas.AddConnector(
+                source: derivedEntity,
+                target: tableEntity,
+                sourceEndpoint: EndpointStyle.RoundDot,
+                targetEndpoint: EndpointStyle.PointedArrow,
+                lineBrush: Brushes.Teal,
+                metadata: null
+            );
+
+            RebuildQuery();
         }
     }
 
@@ -652,6 +753,11 @@ public partial class MainWindow : Window
                     state.EntityType = "Sorting";
                     state.Sorting = sr;
                 }
+                else if (entity.Metadata is DerivedFieldResult dfr)
+                {
+                    state.EntityType = "Derived";
+                    state.Derived = dfr;
+                }
 
                 queryFile.Entities.Add(state);
             }
@@ -765,6 +871,14 @@ public partial class MainWindow : Window
                             metadata: es.Sorting!
                         );
                         break;
+                    case "Derived":
+                        newEntity = QCanvas.AddEntity(
+                            label: es.Label, x: es.X, y: es.Y,
+                            width: es.Width, height: es.Height,
+                            fill: DerivedFill, stroke: DerivedStroke,
+                            metadata: es.Derived!
+                        );
+                        break;
                 }
 
                 if (newEntity != null)
@@ -789,6 +903,8 @@ public partial class MainWindow : Window
                     lineBrush = Brushes.Blue;
                 else if (source.Metadata is SortingResult || target.Metadata is SortingResult)
                     lineBrush = Brushes.Goldenrod;
+                else if (source.Metadata is DerivedFieldResult || target.Metadata is DerivedFieldResult)
+                    lineBrush = Brushes.Teal;
                 else
                     lineBrush = Brushes.Purple;
 

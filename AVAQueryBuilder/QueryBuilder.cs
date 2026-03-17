@@ -39,6 +39,11 @@ public static class QueryBuilder
             .Select(e => (SortingResult)e.Metadata!)
             .FirstOrDefault();
 
+        var derived = entityList
+            .Where(e => e.Metadata is DerivedFieldResult)
+            .Select(e => (DerivedFieldResult)e.Metadata!)
+            .FirstOrDefault();
+
         if (tableSources.Count == 0)
             return string.Empty;
 
@@ -75,6 +80,18 @@ public static class QueryBuilder
                 if (lookup.ColumnAliases.TryGetValue(col, out var colAlias) && !string.IsNullOrWhiteSpace(colAlias))
                     colExpr += $" AS [{colAlias}]";
                 allColumns.Add(colExpr);
+            }
+        }
+
+        // Derived field expressions
+        if (derived != null)
+        {
+            foreach (var df in derived.Fields)
+            {
+                var expr = DerivedFieldViewModel.ToSqlExpression(df.SourceField, df.Derivation, df.Parameter);
+                if (!string.IsNullOrWhiteSpace(df.Alias))
+                    expr += $" AS [{df.Alias}]";
+                allColumns.Add(expr);
             }
         }
 

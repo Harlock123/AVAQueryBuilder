@@ -1,0 +1,81 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:AVAQueryBuilder"
+        x:Class="AVAQueryBuilder.AddDerivedDialog"
+        Title="Add Derived Field"
+        Width="850" Height="450"
+        WindowStartupLocation="CenterOwner"
+        CanResize="True" MinWidth="700" MinHeight="300">
+    <Grid Margin="16" RowDefinitions="Auto,*,Auto,Auto,Auto">
+
+        <!-- Column headers -->
+        <Grid Grid.Row="0" ColumnDefinitions="2*,Auto,Auto,2*,30"
+              Margin="0,0,0,4">
+            <TextBlock Grid.Column="0" Text="Source Field" FontWeight="SemiBold"
+                       FontSize="11" Margin="0,0,4,0" />
+            <TextBlock Grid.Column="1" Text="Derivation" FontWeight="SemiBold"
+                       FontSize="11" Margin="4,0,4,0" />
+            <TextBlock Grid.Column="2" Text="N" FontWeight="SemiBold"
+                       FontSize="11" Margin="4,0,4,0" />
+            <TextBlock Grid.Column="3" Text="Alias" FontWeight="SemiBold"
+                       FontSize="11" Margin="4,0,4,0" />
+        </Grid>
+
+        <!-- Derived field rows -->
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <ItemsControl x:Name="derivedList">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="local:DerivedFieldViewModel">
+                        <Grid ColumnDefinitions="2*,Auto,Auto,2*,30"
+                              Margin="0,2,0,2">
+                            <ComboBox Grid.Column="0" ItemsSource="{Binding AvailableFields}"
+                                      SelectedItem="{Binding SelectedField}"
+                                      HorizontalAlignment="Stretch" Margin="0,0,4,0"
+                                      IsEditable="False" />
+                            <ComboBox Grid.Column="1"
+                                      ItemsSource="{x:Static local:DerivedFieldViewModel.Derivations}"
+                                      SelectedItem="{Binding SelectedDerivation}"
+                                      Margin="4,0,4,0" Width="160" />
+                            <TextBox Grid.Column="2" Text="{Binding Parameter}"
+                                     IsVisible="{Binding ShowParameter}"
+                                     Watermark="N" Width="50"
+                                     Margin="4,0,4,0" />
+                            <TextBox Grid.Column="3" Text="{Binding Alias}"
+                                     Watermark="alias (required)"
+                                     HorizontalAlignment="Stretch" Margin="4,0,4,0" />
+                            <Button Grid.Column="4" Content="X" Width="26" Height="26"
+                                    FontSize="10" Padding="0"
+                                    HorizontalContentAlignment="Center"
+                                    VerticalContentAlignment="Center"
+                                    Tag="{Binding}"
+                                    Click="CmdRemoveDerived_Click" />
+                        </Grid>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+
+        <!-- Add button -->
+        <Button Grid.Row="2" Content="+ Add Derived Field" Margin="0,8,0,8"
+                HorizontalAlignment="Left" Click="CmdAddDerived_Click" />
+
+        <!-- Preview -->
+        <StackPanel Grid.Row="3" Spacing="2" Margin="0,0,0,8">
+            <TextBlock Text="Preview:" FontSize="10" Foreground="Gray" />
+            <TextBlock x:Name="txtPreview" FontSize="11" FontFamily="Consolas"
+                       TextWrapping="Wrap" Foreground="DarkBlue" />
+        </StackPanel>
+
+        <!-- Status and buttons -->
+        <Grid Grid.Row="4" ColumnDefinitions="*,Auto">
+            <TextBlock x:Name="txtStatus" Grid.Column="0" FontSize="10"
+                       Foreground="Gray" VerticalAlignment="Center" />
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                <Button x:Name="cmdOk" Content="OK" Width="80"
+                        Click="CmdOk_Click" />
+                <Button x:Name="cmdCancel" Content="Cancel" Width="80"
+                        Click="CmdCancel_Click" />
+            </StackPanel>
+        </Grid>
+    </Grid>
+</Window>

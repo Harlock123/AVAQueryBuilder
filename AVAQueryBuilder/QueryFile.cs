@@ -35,6 +35,9 @@ public class EntityState
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public SortingResult? Sorting { get; set; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public DerivedFieldResult? Derived { get; set; }
 }
 
 public class ConnectorState
