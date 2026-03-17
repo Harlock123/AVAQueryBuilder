@@ -9,5 +9,6 @@ public class ConnectedSourceResult
     public string LookupTableName { get; set; } = string.Empty;
     public string JoinFieldInLookup { get; set; } = string.Empty;
     public List<string> ReturnFields { get; set; } = new();
+    public Dictionary<string, string> ColumnAliases { get; set; } = new();
     public int OrdinalValue { get; set; }
 }

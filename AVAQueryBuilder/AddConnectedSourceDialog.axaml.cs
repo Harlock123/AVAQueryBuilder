@@ -77,9 +77,13 @@ public partial class AddConnectedSourceDialog : Window
                     _returnFields.Add(new ColumnItem { Name = col, IsSelected = false });
             }
 
-            // Restore return field selections
+            // Restore return field selections and aliases
             foreach (var col in _returnFields)
+            {
                 col.IsSelected = existing.ReturnFields.Contains(col.Name);
+                if (existing.ColumnAliases.TryGetValue(col.Name, out var alias))
+                    col.Alias = alias;
+            }
         }
 
         _isRehydrating = false;
@@ -219,6 +223,10 @@ public partial class AddConnectedSourceDialog : Window
             return;
         }
 
+        var aliases = _returnFields
+            .Where(c => c.IsSelected && !string.IsNullOrWhiteSpace(c.Alias))
+            .ToDictionary(c => c.Name, c => c.Alias);
+
         Result = new ConnectedSourceResult
         {
             SourceTableName = SourceTable.TableName,
@@ -226,6 +234,7 @@ public partial class AddConnectedSourceDialog : Window
             LookupTableName = ExtractTableName(selectedLookup),
             JoinFieldInLookup = joinField,
             ReturnFields = returnFields,
+            ColumnAliases = aliases,
             OrdinalValue = OrdinalValue
         };
 

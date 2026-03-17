@@ -56,14 +56,26 @@ public static class QueryBuilder
             var prefix = (tableSources.Count > 1 || lookups.Count > 0)
                 ? $"{table.TableName}."
                 : "";
-            allColumns.AddRange(table.SelectedColumns.Select(col => $"{prefix}{col}"));
+            foreach (var col in table.SelectedColumns)
+            {
+                var colExpr = $"{prefix}{col}";
+                if (table.ColumnAliases.TryGetValue(col, out var colAlias) && !string.IsNullOrWhiteSpace(colAlias))
+                    colExpr += $" AS [{colAlias}]";
+                allColumns.Add(colExpr);
+            }
         }
 
         // Columns from lookup joins
         foreach (var lookup in lookups)
         {
-            var alias = $"LOOKUP_{lookup.OrdinalValue}";
-            allColumns.AddRange(lookup.ReturnFields.Select(col => $"{alias}.{col}"));
+            var tableAlias = $"LOOKUP_{lookup.OrdinalValue}";
+            foreach (var col in lookup.ReturnFields)
+            {
+                var colExpr = $"{tableAlias}.{col}";
+                if (lookup.ColumnAliases.TryGetValue(col, out var colAlias) && !string.IsNullOrWhiteSpace(colAlias))
+                    colExpr += $" AS [{colAlias}]";
+                allColumns.Add(colExpr);
+            }
         }
 
         AppendWrappedList(sb, allColumns, "       ");

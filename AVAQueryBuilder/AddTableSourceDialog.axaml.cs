@@ -58,10 +58,14 @@ public partial class AddTableSourceDialog : Window
         }
         _suppressSelectionChanged = false;
 
-        // Load columns then restore check state
+        // Load columns then restore check state and aliases
         await LoadColumnsAsync(existing.TableName);
         foreach (var col in _columns)
+        {
             col.IsSelected = existing.SelectedColumns.Contains(col.Name);
+            if (existing.ColumnAliases.TryGetValue(col.Name, out var alias))
+                col.Alias = alias;
+        }
     }
 
     private async Task LoadTablesAndViewsAsync()
@@ -218,11 +222,16 @@ public partial class AddTableSourceDialog : Window
             return;
         }
 
+        var aliases = _columns
+            .Where(c => c.IsSelected && !string.IsNullOrWhiteSpace(c.Alias))
+            .ToDictionary(c => c.Name, c => c.Alias);
+
         Result = new TableSourceResult
         {
             TableName = _selectedEntity,
             IsView = _selectedIsView,
-            SelectedColumns = selectedColumns
+            SelectedColumns = selectedColumns,
+            ColumnAliases = aliases
         };
 
         Close(true);
