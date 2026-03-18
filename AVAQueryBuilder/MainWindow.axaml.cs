@@ -37,6 +37,100 @@ public partial class MainWindow : Window
         TheQuery.SyntaxTheme = BuiltInThemes.GitHubLight;
         QCanvas.ElementDoubleClick += QCanvas_ElementDoubleClick;
         QCanvas.ElementRightClick += QCanvas_ElementRightClick;
+        QCanvas.ElementHover += QCanvas_ElementHover;
+    }
+
+    private void QCanvas_ElementHover(object? sender, CanvasElementEventArgs e)
+    {
+        if (e.Entity == null)
+        {
+            ToolTip.SetIsOpen(QCanvas, false);
+            ToolTip.SetTip(QCanvas, null);
+            return;
+        }
+
+        var info = BuildEntitySummary(e.Entity);
+        if (string.IsNullOrWhiteSpace(info))
+        {
+            ToolTip.SetIsOpen(QCanvas, false);
+            return;
+        }
+
+        var content = new Border
+        {
+            Background = new SolidColorBrush(Color.Parse("#FFFDE8")),
+            BorderBrush = new SolidColorBrush(Color.Parse("#D4C87A")),
+            BorderThickness = new Avalonia.Thickness(1),
+            Padding = new Avalonia.Thickness(8),
+            Child = new TextBlock
+            {
+                Text = info,
+                FontSize = 13,
+                FontFamily = new FontFamily("Consolas"),
+                Foreground = Brushes.Black,
+                TextWrapping = TextWrapping.Wrap,
+                MaxWidth = 420
+            }
+        };
+
+        ToolTip.SetTip(QCanvas, content);
+        ToolTip.SetIsOpen(QCanvas, true);
+    }
+
+    private static string BuildEntitySummary(GraphicEntity entity)
+    {
+        switch (entity.Metadata)
+        {
+            case TableSourceResult t:
+                var type = t.IsView ? "View" : "Table";
+                var cols = t.SelectedColumns.Count;
+                var aliasCount = t.ColumnAliases.Count;
+                var colList = string.Join(", ", t.SelectedColumns.Take(8));
+                if (t.SelectedColumns.Count > 8)
+                    colList += $" ... +{t.SelectedColumns.Count - 8} more";
+                var summary = $"{type}: {t.TableName}\nColumns ({cols}): {colList}";
+                if (aliasCount > 0)
+                    summary += $"\nAliases: {aliasCount}";
+                return summary;
+
+            case ConnectedSourceResult c:
+                var joinFields = string.Join(", ", c.JoinFieldsFromSource);
+                var returnList = string.Join(", ", c.ReturnFields.Take(6));
+                if (c.ReturnFields.Count > 6)
+                    returnList += $" ... +{c.ReturnFields.Count - 6} more";
+                var cSummary = $"Lookup: {c.LookupTableName}\n" +
+                               $"Alias: LOOKUP_{c.OrdinalValue}\n" +
+                               $"Join: {joinFields} = {c.JoinFieldInLookup}\n" +
+                               $"Returns ({c.ReturnFields.Count}): {returnList}";
+                if (c.ColumnAliases.Count > 0)
+                    cSummary += $"\nAliases: {c.ColumnAliases.Count}";
+                return cSummary;
+
+            case LimiterResult l:
+                return $"TOP {l.TopCount} rows";
+
+            case FilterResult f:
+                var conditions = f.Conditions.Select(cond =>
+                {
+                    var field = cond.Field;
+                    if (cond.CastAs is not null and not "(none)")
+                        field = $"CAST({field})";
+                    return $"  {field} {cond.Operator} {cond.Value}";
+                });
+                return $"WHERE ({f.Combiner})\n{string.Join("\n", conditions)}";
+
+            case SortingResult s:
+                var sortLines = s.Fields.Select(sf => $"  {sf.Field} {sf.Direction}");
+                return $"ORDER BY\n{string.Join("\n", sortLines)}";
+
+            case DerivedFieldResult d:
+                var derivedLines = d.Fields.Select(df =>
+                    $"  {DerivedFieldViewModel.ToSqlExpression(df.SourceField, df.Derivation, df.Parameter)} AS [{df.Alias}]");
+                return $"Derived Fields ({d.Fields.Count})\n{string.Join("\n", derivedLines)}";
+
+            default:
+                return string.Empty;
+        }
     }
 
     private void QCanvas_ElementRightClick(object? sender, CanvasElementEventArgs e)
@@ -547,6 +641,18 @@ public partial class MainWindow : Window
         {
             cmdExecuteQuery.IsEnabled = true;
             cmdExecuteQuery.Content = "Execute Query";
+        }
+    }
+
+    private async void CmdExportToExcel_Click(object? sender, RoutedEventArgs e)
+    {
+        try
+        {
+            await QResultsGrid.ExportToExcelWithDialog();
+        }
+        catch (Exception ex)
+        {
+            ShowUnderConstruction($"Export failed: {ex.Message}");
         }
     }
 
