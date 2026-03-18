@@ -38,6 +38,9 @@ public class EntityState
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public DerivedFieldResult? Derived { get; set; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public DistinctResult? Distinct { get; set; }
 }
 
 public class ConnectorState

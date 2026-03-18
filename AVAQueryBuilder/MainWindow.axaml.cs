@@ -30,6 +30,10 @@ public partial class MainWindow : Window
     private static readonly SolidColorBrush SortingStroke = new(Color.Parse("#CA8A04"));
     private static readonly SolidColorBrush DerivedFill = new(Color.Parse("#A8E0CC"));
     private static readonly SolidColorBrush DerivedStroke = new(Color.Parse("#2D8B70"));
+    private static readonly SolidColorBrush DistinctFill = new(Color.Parse("#FDBA74"));
+    private static readonly SolidColorBrush DistinctStroke = new(Color.Parse("#C2410C"));
+
+    private bool _contextMenuOpen;
 
     public MainWindow()
     {
@@ -42,6 +46,8 @@ public partial class MainWindow : Window
 
     private void QCanvas_ElementHover(object? sender, CanvasElementEventArgs e)
     {
+        if (_contextMenuOpen) return;
+
         if (e.Entity == null)
         {
             ToolTip.SetIsOpen(QCanvas, false);
@@ -114,8 +120,15 @@ public partial class MainWindow : Window
                 {
                     var field = cond.Field;
                     if (cond.CastAs is not null and not "(none)")
-                        field = $"CAST({field})";
-                    return $"  {field} {cond.Operator} {cond.Value}";
+                        field = $"CAST({field} AS {cond.CastAs})";
+                    return cond.Operator switch
+                    {
+                        "IS NULL" or "IS NOT NULL" => $"  {field} {cond.Operator}",
+                        "IS EMPTY" => $"  {field} = ''",
+                        "IS NOT EMPTY" => $"  {field} != ''",
+                        "BETWEEN" => $"  {field} BETWEEN '{cond.Value}' AND '{cond.Value2}'",
+                        _ => $"  {field} {cond.Operator} '{cond.Value}'"
+                    };
                 });
                 return $"WHERE ({f.Combiner})\n{string.Join("\n", conditions)}";
 
@@ -128,6 +141,9 @@ public partial class MainWindow : Window
                     $"  {DerivedFieldViewModel.ToSqlExpression(df.SourceField, df.Derivation, df.Parameter)} AS [{df.Alias}]");
                 return $"Derived Fields ({d.Fields.Count})\n{string.Join("\n", derivedLines)}";
 
+            case DistinctResult:
+                return "SELECT DISTINCT — eliminates duplicate rows";
+
             default:
                 return string.Empty;
         }
@@ -135,6 +151,9 @@ public partial class MainWindow : Window
 
     private void QCanvas_ElementRightClick(object? sender, CanvasElementEventArgs e)
     {
+        ToolTip.SetIsOpen(QCanvas, false);
+        ToolTip.SetTip(QCanvas, null);
+
         if (e.Entity == null) return;
 
         var entity = e.Entity;
@@ -148,6 +167,9 @@ public partial class MainWindow : Window
 
         contextMenu.Items.Add(editItem);
         contextMenu.Items.Add(deleteItem);
+
+        _contextMenuOpen = true;
+        contextMenu.Closed += (_, _) => _contextMenuOpen = false;
 
         contextMenu.Open(QCanvas);
     }
@@ -290,6 +312,7 @@ public partial class MainWindow : Window
             FilterResult => "Filter",
             SortingResult => "Sorting",
             DerivedFieldResult => "Derived Field",
+            DistinctResult => "Distinct",
             _ => "Entity"
         };
 
@@ -382,8 +405,15 @@ public partial class MainWindow : Window
         cmdAddConnectedSource.IsEnabled = hasTable;
         cmdAddDerived.IsEnabled = hasTable;
         cmdAddLimiter.IsEnabled = hasTable;
+        cmdToggleDistinct.IsEnabled = hasTable;
         cmdAddFilter.IsEnabled = hasTable;
         cmdAddSorting.IsEnabled = hasTable;
+
+        var hasDistinct = QCanvas.Entities.Any(e => e.Metadata is DistinctResult);
+        cmdToggleDistinct.Content = hasDistinct ? "Remove Distinct" : "Add Distinct";
+
+        var hasLimiter = QCanvas.Entities.Any(e => e.Metadata is LimiterResult);
+        cmdAddLimiter.Content = hasLimiter ? "Remove Limiter" : "Add Limiter";
     }
 
     private void ShowUnderConstruction(string functionName)
@@ -555,28 +585,27 @@ public partial class MainWindow : Window
 
     private async void CmdAddLimiter_Click(object? sender, RoutedEventArgs e)
     {
-        var dialog = new AddLimiterDialog();
-
-        // If a limiter already exists, pre-populate with its value
+        // Toggle: if limiter exists, remove it
         var existingLimiterEntity = QCanvas.Entities.FirstOrDefault(ent => ent.Metadata is LimiterResult);
-        if (existingLimiterEntity?.Metadata is LimiterResult existing)
-            dialog.ExistingTopCount = existing.TopCount;
+        if (existingLimiterEntity != null)
+        {
+            var oldConnectors = QCanvas.Connectors
+                .Where(c => c.SourceEntityId == existingLimiterEntity.Id || c.TargetEntityId == existingLimiterEntity.Id)
+                .ToList();
+            foreach (var c in oldConnectors)
+                QCanvas.RemoveConnector(c);
+            QCanvas.RemoveEntity(existingLimiterEntity);
+            UpdateConnectedSourceButtonState();
+            RebuildQuery();
+            return;
+        }
+
+        // No limiter exists — show dialog to add one
+        var dialog = new AddLimiterDialog();
 
         var result = await dialog.ShowDialog<bool?>(this);
         if (result == true && dialog.Result != null)
         {
-            // Remove any existing limiter entity and its connectors
-            var oldLimiter = QCanvas.Entities.FirstOrDefault(ent => ent.Metadata is LimiterResult);
-            if (oldLimiter != null)
-            {
-                var oldConnectors = QCanvas.Connectors
-                    .Where(c => c.SourceEntityId == oldLimiter.Id || c.TargetEntityId == oldLimiter.Id)
-                    .ToList();
-                foreach (var c in oldConnectors)
-                    QCanvas.RemoveConnector(c);
-                QCanvas.RemoveEntity(oldLimiter);
-            }
-
             // Position: next available slot to the right, after all lookups
             var tableEntity = QCanvas.Entities.FirstOrDefault(ent => ent.Metadata is TableSourceResult);
             var rightSideCount = QCanvas.Entities
@@ -608,8 +637,56 @@ public partial class MainWindow : Window
                 );
             }
 
+            UpdateConnectedSourceButtonState();
             RebuildQuery();
         }
+    }
+
+    private void CmdToggleDistinct_Click(object? sender, RoutedEventArgs e)
+    {
+        var existing = QCanvas.Entities.FirstOrDefault(ent => ent.Metadata is DistinctResult);
+        if (existing != null)
+        {
+            // Remove distinct entity and its connectors
+            var connectors = QCanvas.Connectors
+                .Where(c => c.SourceEntityId == existing.Id || c.TargetEntityId == existing.Id)
+                .ToList();
+            foreach (var c in connectors)
+                QCanvas.RemoveConnector(c);
+            QCanvas.RemoveEntity(existing);
+        }
+        else
+        {
+            // Add distinct entity
+            var tableEntity = QCanvas.Entities.FirstOrDefault(ent => ent.Metadata is TableSourceResult);
+            if (tableEntity == null) return;
+
+            var xPos = tableEntity.X;
+            var yPos = tableEntity.Y + tableEntity.Height + 20;
+
+            var distinctEntity = QCanvas.AddEntity(
+                label: "DISTINCT",
+                x: xPos,
+                y: yPos,
+                width: 120,
+                height: 35,
+                fill: DistinctFill,
+                stroke: DistinctStroke,
+                metadata: new DistinctResult()
+            );
+
+            QCanvas.AddConnector(
+                source: distinctEntity,
+                target: tableEntity,
+                sourceEndpoint: EndpointStyle.RoundDot,
+                targetEndpoint: EndpointStyle.PointedArrow,
+                lineBrush: Brushes.OrangeRed,
+                metadata: null
+            );
+        }
+
+        UpdateConnectedSourceButtonState();
+        RebuildQuery();
     }
 
     private async void CmdExecuteQuery_Click(object? sender, RoutedEventArgs e)
@@ -864,6 +941,11 @@ public partial class MainWindow : Window
                     state.EntityType = "Derived";
                     state.Derived = dfr;
                 }
+                else if (entity.Metadata is DistinctResult dr)
+                {
+                    state.EntityType = "Distinct";
+                    state.Distinct = dr;
+                }
 
                 queryFile.Entities.Add(state);
             }
@@ -985,6 +1067,14 @@ public partial class MainWindow : Window
                             metadata: es.Derived!
                         );
                         break;
+                    case "Distinct":
+                        newEntity = QCanvas.AddEntity(
+                            label: es.Label, x: es.X, y: es.Y,
+                            width: es.Width, height: es.Height,
+                            fill: DistinctFill, stroke: DistinctStroke,
+                            metadata: es.Distinct!
+                        );
+                        break;
                 }
 
                 if (newEntity != null)
@@ -1011,6 +1101,8 @@ public partial class MainWindow : Window
                     lineBrush = Brushes.Goldenrod;
                 else if (source.Metadata is DerivedFieldResult || target.Metadata is DerivedFieldResult)
                     lineBrush = Brushes.Teal;
+                else if (source.Metadata is DistinctResult || target.Metadata is DistinctResult)
+                    lineBrush = Brushes.OrangeRed;
                 else
                     lineBrush = Brushes.Purple;
 

@@ -44,11 +44,17 @@ public static class QueryBuilder
             .Select(e => (DerivedFieldResult)e.Metadata!)
             .FirstOrDefault();
 
+        var isDistinct = entityList.Any(e => e.Metadata is DistinctResult);
+
         if (tableSources.Count == 0)
             return string.Empty;
 
         var sb = new StringBuilder();
         sb.Append("SELECT ");
+
+        // DISTINCT keyword
+        if (isDistinct)
+            sb.Append("DISTINCT ");
 
         // TOP N clause
         if (limiter != null)
