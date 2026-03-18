@@ -195,6 +195,19 @@ public partial class AddConnectedSourceDialog : Window
             _returnFields.Add(new ColumnItem { Name = col, IsSelected = false });
     }
 
+    private void CmdFieldBrowser_Click(object? sender, RoutedEventArgs e)
+    {
+        if (lstLookupTables.SelectedItem is not string selected)
+        {
+            txtStatus.Text = "Select a table/view to browse first.";
+            return;
+        }
+
+        var tableName = ExtractTableName(selected);
+        var browser = new FieldBrowserDialog { TableName = tableName };
+        browser.ShowDialog(this);
+    }
+
     private void CmdOk_Click(object? sender, RoutedEventArgs e)
     {
         var joinFromSource = _sourceFields.Where(c => c.IsSelected).Select(c => c.Name).ToList();

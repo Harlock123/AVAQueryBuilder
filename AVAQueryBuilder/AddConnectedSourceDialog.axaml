@@ -96,6 +96,7 @@
                        Foreground="Gray" Margin="0,0,0,8" />
             <StackPanel Grid.Row="1" Orientation="Horizontal"
                         HorizontalAlignment="Right" Spacing="8">
+                <Button Content="Field Browser" Click="CmdFieldBrowser_Click" />
                 <Button x:Name="cmdOk" Content="OK" Width="80"
                         Click="CmdOk_Click" />
                 <Button x:Name="cmdCancel" Content="Cancel" Width="80"

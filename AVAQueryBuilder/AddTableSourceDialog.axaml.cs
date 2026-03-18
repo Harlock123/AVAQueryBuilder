@@ -195,6 +195,18 @@ public partial class AddTableSourceDialog : Window
         await LoadColumnsAsync(selected);
     }
 
+    private void CmdFieldBrowser_Click(object? sender, RoutedEventArgs e)
+    {
+        if (string.IsNullOrWhiteSpace(_selectedEntity))
+        {
+            txtStatus.Text = "Select a table or view first.";
+            return;
+        }
+
+        var browser = new FieldBrowserDialog { TableName = _selectedEntity };
+        browser.ShowDialog(this);
+    }
+
     private void CmdSelectAll_Click(object? sender, RoutedEventArgs e)
     {
         foreach (var col in _columns)
