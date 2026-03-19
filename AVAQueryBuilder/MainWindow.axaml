@@ -47,12 +47,10 @@
             <!-- Top region (60px) -->
             <Border Grid.Row="0" BorderBrush="Gray" BorderThickness="0,0,0,1"
                     Padding="4">
-                <Grid ColumnDefinitions="3*,*" VerticalAlignment="Center">
-                    <StackPanel Grid.Column="0" Spacing="2">
-                        <TextBox x:Name="ConnectionStringTextBox" />
-                        <TextBlock Text="Connection String" FontSize="10" Foreground="Gray" />
-                    </StackPanel>
-                </Grid>
+                <StackPanel Spacing="2" VerticalAlignment="Center">
+                    <TextBox x:Name="ConnectionStringTextBox" />
+                    <TextBlock Text="Connection String" FontSize="10" Foreground="Gray" />
+                </StackPanel>
             </Border>
 
             <!-- Splitter between top and center -->
@@ -98,7 +96,7 @@
                         <TabItem.Header>
                             <TextBlock Text="Results Grid" FontSize="12" />
                         </TabItem.Header>
-                        <lawgrid:LAWgrid x:Name="QResultsGrid" />
+                        <lawgrid:LAWgrid x:Name="QResultsGrid" GridTitle="Grid of Results from Query" />
                     </TabItem>
                 </TabControl>
                 <Border Grid.Row="2" BorderBrush="Gray" BorderThickness="0,1,0,0"
