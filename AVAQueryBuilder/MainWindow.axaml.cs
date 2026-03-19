@@ -32,6 +32,8 @@ public partial class MainWindow : Window
     private static readonly SolidColorBrush DerivedStroke = new(Color.Parse("#2D8B70"));
     private static readonly SolidColorBrush DistinctFill = new(Color.Parse("#FDBA74"));
     private static readonly SolidColorBrush DistinctStroke = new(Color.Parse("#C2410C"));
+    private static readonly SolidColorBrush GroupByFill = new(Color.Parse("#E879A8"));
+    private static readonly SolidColorBrush GroupByStroke = new(Color.Parse("#9D174D"));
 
     private bool _contextMenuOpen;
 
@@ -140,6 +142,25 @@ public partial class MainWindow : Window
                 var derivedLines = d.Fields.Select(df =>
                     $"  {DerivedFieldViewModel.ToSqlExpression(df.SourceField, df.Derivation, df.Parameter)} AS [{df.Alias}]");
                 return $"Derived Fields ({d.Fields.Count})\n{string.Join("\n", derivedLines)}";
+
+            case GroupByResult g:
+                var gFields = string.Join(", ", g.GroupFields.Take(5));
+                if (g.GroupFields.Count > 5)
+                    gFields += $" ... +{g.GroupFields.Count - 5} more";
+                var aggLines = g.Aggregates.Select(a =>
+                {
+                    var expr = a.Function == "COUNT(*)" ? "COUNT(*)" :
+                        a.Function == "COUNT DISTINCT" ? $"COUNT(DISTINCT {a.Field})" :
+                        $"{a.Function}({a.Field})";
+                    return $"  {expr} AS [{a.Alias}]";
+                });
+                var gSummary = $"GROUP BY: {gFields}\nAggregates ({g.Aggregates.Count}):\n{string.Join("\n", aggLines)}";
+                if (g.HavingConditions.Count > 0)
+                {
+                    var havLines = g.HavingConditions.Select(h => $"  {h.Expression} {h.Operator} {h.Value}");
+                    gSummary += $"\nHAVING ({g.HavingCombiner}):\n{string.Join("\n", havLines)}";
+                }
+                return gSummary;
 
             case DistinctResult:
                 return "SELECT DISTINCT — eliminates duplicate rows";
@@ -259,10 +280,20 @@ public partial class MainWindow : Window
                 .OrderBy(l => l.OrdinalValue)
                 .ToList();
 
+            var derivedResultSort = QCanvas.Entities
+                .FirstOrDefault(ent => ent.Metadata is DerivedFieldResult)
+                ?.Metadata as DerivedFieldResult;
+
+            var groupByResultSort = QCanvas.Entities
+                .FirstOrDefault(ent => ent.Metadata is GroupByResult)
+                ?.Metadata as GroupByResult;
+
             var dialog = new AddSortingDialog
             {
                 SourceTable = sourceTable,
                 Lookups = lookups,
+                DerivedFields = derivedResultSort,
+                GroupByFields = groupByResultSort,
                 ExistingResult = existingSorting
             };
             var result = await dialog.ShowDialog<bool?>(this);
@@ -300,6 +331,37 @@ public partial class MainWindow : Window
                 RebuildQuery();
             }
         }
+        else if (entity.Metadata is GroupByResult existingGroupBy)
+        {
+            var tableEntity = QCanvas.Entities.FirstOrDefault(ent => ent.Metadata is TableSourceResult);
+            if (tableEntity?.Metadata is not TableSourceResult sourceTable) return;
+
+            var lookups = QCanvas.Entities
+                .Where(ent => ent.Metadata is ConnectedSourceResult)
+                .Select(ent => (ConnectedSourceResult)ent.Metadata!)
+                .OrderBy(l => l.OrdinalValue)
+                .ToList();
+
+            var derivedResult = QCanvas.Entities
+                .FirstOrDefault(ent => ent.Metadata is DerivedFieldResult)
+                ?.Metadata as DerivedFieldResult;
+
+            var dialog = new AddGroupByDialog
+            {
+                SourceTable = sourceTable,
+                Lookups = lookups,
+                DerivedFields = derivedResult,
+                ExistingResult = existingGroupBy
+            };
+            var result = await dialog.ShowDialog<bool?>(this);
+            if (result == true && dialog.Result != null)
+            {
+                entity.Metadata = null;
+                entity.Label = $"GROUP BY ({dialog.Result.GroupFields.Count}+{dialog.Result.Aggregates.Count})";
+                entity.Metadata = dialog.Result;
+                RebuildQuery();
+            }
+        }
     }
 
     private async void DeleteEntity(GraphicEntity entity)
@@ -313,6 +375,7 @@ public partial class MainWindow : Window
             SortingResult => "Sorting",
             DerivedFieldResult => "Derived Field",
             DistinctResult => "Distinct",
+            GroupByResult => "Group By",
             _ => "Entity"
         };
 
@@ -404,6 +467,7 @@ public partial class MainWindow : Window
         var hasTable = QCanvas.Entities.Any(e => e.Metadata is TableSourceResult);
         cmdAddConnectedSource.IsEnabled = hasTable;
         cmdAddDerived.IsEnabled = hasTable;
+        cmdAddGroupBy.IsEnabled = hasTable;
         cmdAddLimiter.IsEnabled = hasTable;
         cmdToggleDistinct.IsEnabled = hasTable;
         cmdAddFilter.IsEnabled = hasTable;
@@ -580,6 +644,83 @@ public partial class MainWindow : Window
         else
         {
             _lookupOrdinal--;
+        }
+    }
+
+    private async void CmdAddGroupBy_Click(object? sender, RoutedEventArgs e)
+    {
+        var tableEntity = QCanvas.Entities.FirstOrDefault(ent => ent.Metadata is TableSourceResult);
+        if (tableEntity?.Metadata is not TableSourceResult sourceTable)
+        {
+            ShowUnderConstruction("Add a Table Source first");
+            return;
+        }
+
+        var lookups = QCanvas.Entities
+            .Where(ent => ent.Metadata is ConnectedSourceResult)
+            .Select(ent => (ConnectedSourceResult)ent.Metadata!)
+            .OrderBy(l => l.OrdinalValue)
+            .ToList();
+
+        var derivedResult = QCanvas.Entities
+            .FirstOrDefault(ent => ent.Metadata is DerivedFieldResult)
+            ?.Metadata as DerivedFieldResult;
+
+        var dialog = new AddGroupByDialog
+        {
+            SourceTable = sourceTable,
+            Lookups = lookups,
+            DerivedFields = derivedResult
+        };
+
+        // Pre-populate if group by already exists
+        var existingEntity = QCanvas.Entities.FirstOrDefault(ent => ent.Metadata is GroupByResult);
+        if (existingEntity?.Metadata is GroupByResult existing)
+            dialog.ExistingResult = existing;
+
+        var result = await dialog.ShowDialog<bool?>(this);
+        if (result == true && dialog.Result != null)
+        {
+            // Remove existing group by and its connectors
+            var oldGroupBy = QCanvas.Entities.FirstOrDefault(ent => ent.Metadata is GroupByResult);
+            if (oldGroupBy != null)
+            {
+                var oldConnectors = QCanvas.Connectors
+                    .Where(c => c.SourceEntityId == oldGroupBy.Id || c.TargetEntityId == oldGroupBy.Id)
+                    .ToList();
+                foreach (var c in oldConnectors)
+                    QCanvas.RemoveConnector(c);
+                QCanvas.RemoveEntity(oldGroupBy);
+            }
+
+            // Position: next slot on the right side
+            var rightSideCount = QCanvas.Entities
+                .Count(ent => ent.Metadata is ConnectedSourceResult or LimiterResult or FilterResult
+                    or SortingResult or DerivedFieldResult);
+            var xPos = tableEntity.X + tableEntity.Width + 60;
+            var yPos = tableEntity.Y + (rightSideCount * 55);
+
+            var groupByEntity = QCanvas.AddEntity(
+                label: $"GROUP BY ({dialog.Result.GroupFields.Count}+{dialog.Result.Aggregates.Count})",
+                x: xPos,
+                y: yPos,
+                width: 160,
+                height: 40,
+                fill: GroupByFill,
+                stroke: GroupByStroke,
+                metadata: dialog.Result
+            );
+
+            QCanvas.AddConnector(
+                source: tableEntity,
+                target: groupByEntity,
+                sourceEndpoint: EndpointStyle.RoundDot,
+                targetEndpoint: EndpointStyle.PointedArrow,
+                lineBrush: Brushes.DeepPink,
+                metadata: null
+            );
+
+            RebuildQuery();
         }
     }
 
@@ -819,10 +960,20 @@ public partial class MainWindow : Window
             .OrderBy(l => l.OrdinalValue)
             .ToList();
 
+        var derivedResultSort = QCanvas.Entities
+            .FirstOrDefault(ent => ent.Metadata is DerivedFieldResult)
+            ?.Metadata as DerivedFieldResult;
+
+        var groupByResultSort = QCanvas.Entities
+            .FirstOrDefault(ent => ent.Metadata is GroupByResult)
+            ?.Metadata as GroupByResult;
+
         var dialog = new AddSortingDialog
         {
             SourceTable = sourceTable,
-            Lookups = lookups
+            Lookups = lookups,
+            DerivedFields = derivedResultSort,
+            GroupByFields = groupByResultSort
         };
 
         // Pre-populate if sorting already exists
@@ -945,6 +1096,11 @@ public partial class MainWindow : Window
                 {
                     state.EntityType = "Distinct";
                     state.Distinct = dr;
+                }
+                else if (entity.Metadata is GroupByResult gbr)
+                {
+                    state.EntityType = "GroupBy";
+                    state.GroupBy = gbr;
                 }
 
                 queryFile.Entities.Add(state);
@@ -1075,6 +1231,14 @@ public partial class MainWindow : Window
                             metadata: es.Distinct!
                         );
                         break;
+                    case "GroupBy":
+                        newEntity = QCanvas.AddEntity(
+                            label: es.Label, x: es.X, y: es.Y,
+                            width: es.Width, height: es.Height,
+                            fill: GroupByFill, stroke: GroupByStroke,
+                            metadata: es.GroupBy!
+                        );
+                        break;
                 }
 
                 if (newEntity != null)
@@ -1103,6 +1267,8 @@ public partial class MainWindow : Window
                     lineBrush = Brushes.Teal;
                 else if (source.Metadata is DistinctResult || target.Metadata is DistinctResult)
                     lineBrush = Brushes.OrangeRed;
+                else if (source.Metadata is GroupByResult || target.Metadata is GroupByResult)
+                    lineBrush = Brushes.DeepPink;
                 else
                     lineBrush = Brushes.Purple;
 

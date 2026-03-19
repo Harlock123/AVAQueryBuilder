@@ -16,6 +16,8 @@ public partial class AddSortingDialog : Window
 
     public TableSourceResult SourceTable { get; set; } = null!;
     public List<ConnectedSourceResult> Lookups { get; set; } = new();
+    public DerivedFieldResult? DerivedFields { get; set; }
+    public GroupByResult? GroupByFields { get; set; }
     public SortingResult? ExistingResult { get; set; }
     public SortingResult? Result { get; private set; }
 
@@ -61,6 +63,31 @@ public partial class AddSortingDialog : Window
         catch (Exception ex)
         {
             txtStatus.Text = $"Error loading fields: {ex.Message}";
+        }
+
+        // Add derived field expressions
+        if (DerivedFields != null)
+        {
+            foreach (var df in DerivedFields.Fields)
+            {
+                var expr = DerivedFieldViewModel.ToSqlExpression(df.SourceField, df.Derivation, df.Parameter);
+                fields.Add(expr);
+            }
+        }
+
+        // Add aggregate expressions from GROUP BY
+        if (GroupByFields != null)
+        {
+            foreach (var agg in GroupByFields.Aggregates)
+            {
+                var expr = agg.Function switch
+                {
+                    "COUNT(*)" => "COUNT(*)",
+                    "COUNT DISTINCT" => $"COUNT(DISTINCT {agg.Field})",
+                    _ => $"{agg.Function}({agg.Field})"
+                };
+                fields.Add(expr);
+            }
         }
 
         _availableFields = fields;

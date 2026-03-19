@@ -1,0 +1,150 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:AVAQueryBuilder"
+        x:Class="AVAQueryBuilder.AddGroupByDialog"
+        Title="Add Group By (Aggregates)"
+        Width="950" Height="550"
+        WindowStartupLocation="CenterOwner"
+        CanResize="True" MinWidth="750" MinHeight="400">
+    <Grid Margin="16" RowDefinitions="*,Auto,Auto,Auto">
+
+        <!-- Main split: Group Fields | Aggregates -->
+        <Grid Grid.Row="0" ColumnDefinitions="*,Auto,1.5*">
+
+            <!-- Left: Group By fields (checkboxes) -->
+            <Grid Grid.Column="0" RowDefinitions="Auto,*">
+                <TextBlock Grid.Row="0" Text="Group By Fields"
+                           FontWeight="SemiBold" FontSize="12" Margin="0,0,0,4" />
+                <ListBox x:Name="lstGroupFields" Grid.Row="1">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate x:DataType="local:ColumnItem">
+                            <CheckBox Content="{Binding Name}"
+                                      IsChecked="{Binding IsSelected}" />
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </Grid>
+
+            <GridSplitter Grid.Column="1" Width="4" ResizeDirection="Columns"
+                          Background="DarkGray" Margin="8,0" />
+
+            <!-- Right: Aggregate functions + HAVING -->
+            <Grid Grid.Column="2" RowDefinitions="Auto,Auto,*,Auto,Auto,Auto,*">
+
+                <!-- Aggregate headers -->
+                <TextBlock Grid.Row="0" Text="Aggregate Functions"
+                           FontWeight="SemiBold" FontSize="12" Margin="0,0,0,4" />
+                <Grid Grid.Row="1" ColumnDefinitions="Auto,2*,2*,30" Margin="0,0,0,2">
+                    <TextBlock Grid.Column="0" Text="Function" FontSize="10"
+                               Foreground="Gray" Margin="0,0,4,0" />
+                    <TextBlock Grid.Column="1" Text="Field" FontSize="10"
+                               Foreground="Gray" Margin="4,0,4,0" />
+                    <TextBlock Grid.Column="2" Text="Alias" FontSize="10"
+                               Foreground="Gray" Margin="4,0,4,0" />
+                </Grid>
+
+                <!-- Aggregate rows -->
+                <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
+                    <ItemsControl x:Name="aggregateList">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="local:AggregateViewModel">
+                                <Grid ColumnDefinitions="Auto,2*,2*,30" Margin="0,2,0,2">
+                                    <ComboBox Grid.Column="0"
+                                              ItemsSource="{x:Static local:AggregateViewModel.Functions}"
+                                              SelectedItem="{Binding SelectedFunction}"
+                                              Margin="0,0,4,0" Width="130" />
+                                    <ComboBox Grid.Column="1"
+                                              ItemsSource="{Binding AvailableFields}"
+                                              SelectedItem="{Binding SelectedField}"
+                                              IsVisible="{Binding ShowField}"
+                                              HorizontalAlignment="Stretch" Margin="4,0,4,0" />
+                                    <TextBox Grid.Column="2" Text="{Binding Alias}"
+                                             Watermark="alias (required)"
+                                             HorizontalAlignment="Stretch" Margin="4,0,4,0" />
+                                    <Button Grid.Column="3" Content="X" Width="26" Height="26"
+                                            FontSize="10" Padding="0"
+                                            HorizontalContentAlignment="Center"
+                                            VerticalContentAlignment="Center"
+                                            Tag="{Binding}"
+                                            Click="CmdRemoveAggregate_Click" />
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+
+                <Button Grid.Row="3" Content="+ Add Aggregate" Margin="0,4,0,8"
+                        HorizontalAlignment="Left" Click="CmdAddAggregate_Click" />
+
+                <!-- HAVING section -->
+                <StackPanel Grid.Row="4" Orientation="Horizontal" Spacing="8" Margin="0,0,0,4">
+                    <TextBlock Text="HAVING (optional)" FontWeight="SemiBold"
+                               FontSize="12" VerticalAlignment="Center" />
+                    <ComboBox x:Name="cboHavingCombiner" SelectedIndex="0" Width="70">
+                        <ComboBoxItem Content="AND" />
+                        <ComboBoxItem Content="OR" />
+                    </ComboBox>
+                </StackPanel>
+
+                <Grid Grid.Row="5" ColumnDefinitions="2*,Auto,*,30" Margin="0,0,0,2">
+                    <TextBlock Grid.Column="0" Text="Expression" FontSize="10"
+                               Foreground="Gray" />
+                    <TextBlock Grid.Column="1" Text="Op" FontSize="10"
+                               Foreground="Gray" Margin="4,0,4,0" />
+                    <TextBlock Grid.Column="2" Text="Value" FontSize="10"
+                               Foreground="Gray" Margin="4,0,0,0" />
+                </Grid>
+
+                <ScrollViewer Grid.Row="6" VerticalScrollBarVisibility="Auto">
+                    <StackPanel>
+                        <ItemsControl x:Name="havingList">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="local:HavingViewModel">
+                                    <Grid ColumnDefinitions="2*,Auto,*,30" Margin="0,2,0,2">
+                                        <ComboBox Grid.Column="0"
+                                                  ItemsSource="{Binding AvailableExpressions}"
+                                                  SelectedItem="{Binding Expression}"
+                                                  HorizontalAlignment="Stretch" Margin="0,0,4,0" />
+                                        <ComboBox Grid.Column="1"
+                                                  ItemsSource="{x:Static local:HavingViewModel.Operators}"
+                                                  SelectedItem="{Binding SelectedOperator}"
+                                                  Margin="4,0,4,0" Width="60" />
+                                        <TextBox Grid.Column="2" Text="{Binding Value}"
+                                                 HorizontalAlignment="Stretch" Margin="4,0,4,0" />
+                                        <Button Grid.Column="3" Content="X" Width="26" Height="26"
+                                                FontSize="10" Padding="0"
+                                                HorizontalContentAlignment="Center"
+                                                VerticalContentAlignment="Center"
+                                                Tag="{Binding}"
+                                                Click="CmdRemoveHaving_Click" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <Button Content="+ Add Having" Margin="0,4,0,0"
+                                HorizontalAlignment="Left" Click="CmdAddHaving_Click" />
+                    </StackPanel>
+                </ScrollViewer>
+            </Grid>
+        </Grid>
+
+        <!-- Preview -->
+        <StackPanel Grid.Row="1" Spacing="2" Margin="0,8,0,8">
+            <TextBlock Text="Preview:" FontSize="10" Foreground="Gray" />
+            <TextBlock x:Name="txtPreview" FontSize="11" FontFamily="Consolas"
+                       TextWrapping="Wrap" Foreground="DarkBlue" />
+        </StackPanel>
+
+        <!-- Status and buttons -->
+        <Grid Grid.Row="2" ColumnDefinitions="*,Auto">
+            <TextBlock x:Name="txtStatus" Grid.Column="0" FontSize="10"
+                       Foreground="Gray" VerticalAlignment="Center" />
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                <Button x:Name="cmdOk" Content="OK" Width="80"
+                        Click="CmdOk_Click" />
+                <Button x:Name="cmdCancel" Content="Cancel" Width="80"
+                        Click="CmdCancel_Click" />
+            </StackPanel>
+        </Grid>
+    </Grid>
+</Window>

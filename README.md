@@ -1,10 +1,10 @@
 # AVA Query Builder
 
-A visual SQL query builder built with .NET 9 and [Avalonia UI](https://avaloniaui.net/). Construct SELECT queries by dragging and configuring visual entities on a structured diagram canvas, then execute them against Microsoft SQL Server and view results in an integrated data grid.
+A visual SQL query builder built with .NET 9 and [Avalonia UI](https://avaloniaui.net/). Construct SELECT queries by visually configuring entities on a structured diagram canvas, then execute them against Microsoft SQL Server and view results in an integrated data grid.
 
 ## Overview
 
-AVA Query Builder provides a graphical approach to building SQL queries. Instead of writing SQL by hand, users add visual entities to a canvas — tables, lookup joins, derived fields, limiters, filters, and sorting — and the application generates the corresponding SQL in real time. The generated query is displayed with syntax highlighting and can be executed directly against the connected database.
+AVA Query Builder provides a graphical approach to building SQL queries. Instead of writing SQL by hand, users add visual entities to a canvas — tables, lookup joins, derived fields, group by aggregates, limiters, distinct, filters, and sorting — and the application generates the corresponding SQL in real time. The generated query is displayed with syntax highlighting and can be executed directly against the connected database.
 
 ## Features
 
@@ -17,29 +17,35 @@ AVA Query Builder provides a graphical approach to building SQL queries. Instead
 
 ### Visual Query Building
 
-Entities are added to an interactive canvas ([AVASdCanvas](https://github.com/harlock123/AVASdCanvas)) and connected with arrows to show relationships. Each entity type has a distinct color:
+Entities are added to an interactive canvas ([AVASdCanvas](https://github.com/harlock123/AVASdCanvas)) and connected with color-coded arrows to show relationships. Each entity type has a distinct color:
 
 | Entity Type | Color | Description |
 |---|---|---|
 | **Table Source** | Light Green | A base table or view to SELECT from. Choose specific columns with optional aliases. |
 | **Connected Source (Lookup)** | Light Purple | A LEFT JOIN to another table. Specify join keys and return fields with optional aliases. Aliased as `LOOKUP_1`, `LOOKUP_2`, etc. |
-| **Derived Field** | Light Mint | Computed columns using derivations like UPPER, LOWER, DATEPART, LEN, LEFT, ROUND, and more. Each derived field requires an alias. |
-| **Limiter** | Light Red | Adds a `TOP N` clause to the query. Only one limiter at a time. |
-| **Filter** | Light Blue | Adds a `WHERE` clause with multiple conditions combined by AND/OR. Supports CAST, BETWEEN, IN, IS NULL, IS EMPTY, and more. |
-| **Sorting** | Light Yellow | Adds an `ORDER BY` clause with multiple fields, each ASC or DESC. |
+| **Derived Field** | Light Mint | Computed columns using derivations like UPPER, LOWER, DATEPART, LEN, LEFT, RIGHT, ROUND, TRIM, REVERSE, ABS, CEILING, FLOOR, and more. Each derived field requires an alias. Some derivations accept a parameter (e.g., Left N Chars, Round to N Decimals). |
+| **Group By** | Rose Pink | GROUP BY with aggregate functions (COUNT, COUNT(*), COUNT DISTINCT, SUM, AVG, MIN, MAX). Includes optional HAVING clause with AND/OR conditions. Supports grouping by derived field expressions. When active, replaces the normal column list with grouped fields and aggregates. |
+| **Limiter** | Light Red | Adds a `TOP N` clause to the query. Toggle button — click to add, click again to remove. |
+| **Distinct** | Light Orange | Adds `SELECT DISTINCT` to eliminate duplicate rows. Toggle button — no dialog needed. |
+| **Filter** | Light Blue | Adds a `WHERE` clause with multiple conditions combined by AND/OR. Supports CAST AS (VARCHAR, INT, DATE, DATETIME, DECIMAL), BETWEEN, IN, NOT IN, LIKE, IS NULL, IS NOT NULL, IS EMPTY, IS NOT EMPTY. |
+| **Sorting** | Light Yellow | Adds an `ORDER BY` clause with multiple fields, each ASC or DESC. Can sort by derived field expressions and aggregate functions. |
 
+### Entity Interaction
 - **Column Aliases** — Both table source and lookup return fields support optional aliases, generating `column AS [Alias]` in the SQL.
 - **Double-click** any entity to edit its configuration. Changes are reflected immediately in the generated SQL.
-- **Right-click** any entity for a context menu with Edit and Delete options. Deleting the base table removes all entities.
-- **Hover** over any entity to see a tooltip with its metadata summary.
-- **Connectors** with color-coded arrows show relationships between entities.
+- **Right-click** any entity for a context menu with Edit and Delete options. Deleting the base table removes all entities from the canvas.
+- **Hover** over any entity to see a styled tooltip with its metadata summary (pale yellow background, Consolas font).
+- **Toggle buttons** — Limiter and Distinct buttons toggle between Add/Remove states based on canvas state.
+
+### Field Browser
+Dialogs with table/view selection (Add Table Source, Add Connected Source) include a **Field Browser** button that opens a large resizable dialog displaying `SELECT TOP 100 * FROM [table]` in a LAWGrid, allowing users to browse table data before selecting columns or join keys.
 
 ### SQL Generation
 
 The query builder scans all canvas entities and generates a SQL SELECT statement:
 
 ```sql
-SELECT TOP 1000 dbo.Auths.AuthNumber AS [AUTHNUM],
+SELECT DISTINCT TOP 1000 dbo.Auths.AuthNumber AS [AUTHNUM],
        dbo.Auths.MemberID AS [MID],
        LOOKUP_1.LastName AS [LN], LOOKUP_1.SSN AS [SSN],
        DATEPART(YEAR, dbo.Auths.StartDate) AS [YEARauthed],
@@ -51,6 +57,21 @@ WHERE dbo.Auths.ProviderID != '0'
       AND CAST(LOOKUP_1.SSN AS VARCHAR(MAX)) != ''
       AND dbo.Auths.StartDate BETWEEN '2023-01-01' AND '2023-12-31'
 ORDER BY LOOKUP_2.ProviderName ASC, LOOKUP_1.LastName ASC
+```
+
+With GROUP BY:
+
+```sql
+SELECT dbo.Orders.Status,
+       DATEPART(YEAR, dbo.Orders.OrderDate) AS [OrderYear],
+       COUNT(*) AS [OrderCount],
+       SUM(dbo.Orders.Amount) AS [TotalAmount]
+FROM dbo.Orders
+WHERE dbo.Orders.Status != 'Cancelled'
+GROUP BY dbo.Orders.Status,
+         DATEPART(YEAR, dbo.Orders.OrderDate)
+HAVING COUNT(*) > 5
+ORDER BY COUNT(*) DESC
 ```
 
 The generated SQL updates live as entities are added, edited, or removed. Long lines are automatically wrapped at ~80 characters on natural boundaries.
@@ -68,7 +89,7 @@ The generated SQL is displayed using the [SyntaxColorizer](https://github.com/Ha
 ### Save / Load
 
 - **Save Query** (`.qry`) — Persists the entire query state to a JSON file: connection string, all canvas entities with positions and metadata, all connectors, and the lookup ordinal counter.
-- **Load Query** — Restores a previously saved query, rehydrating the canvas, connection string, and all entity configurations.
+- **Load Query** — Restores a previously saved query, rehydrating the canvas, connection string, and all entity configurations. Toggle button states (Limiter, Distinct) update automatically.
 
 ## Screenshots
 
@@ -99,12 +120,16 @@ The generated SQL is displayed using the [SyntaxColorizer](https://github.com/Ha
 |  [Add Table]     |                                            |
 |  [Add Lookup]    |  Canvas (AVASdCanvas)                      |
 |  [Add Derived]   |  +--------+     +-----------+             |
-|  [Add Limiter]   |  | Table  |<----| Lookup    |             |
-|  [Add Filter]    |  +--------+     +-----------+             |
-|  [Add Sorting]   |    |  |  |      +-----------+             |
-|                  |    |  |  +----->| TOP 100   |             |
-|                  |    |  +-------->| WHERE (3) |             |
-|                  |    +----------->| ORDER BY  |             |
+|  [Add Group By]  |  | Table  |<----| Lookup    |             |
+|  [Add Limiter]   |  +--------+     +-----------+             |
+|  [Add Distinct]  |    |  |  |      +-----------+             |
+|  [Add Filter]    |    |  |  +----->| TOP 100   |             |
+|  [Add Sorting]   |    |  +------->| WHERE (3) |             |
+|                  |    +---------->| ORDER BY  |             |
+|                  |    |           +-----------+             |
+|                  |    +---------->| GROUP BY  |             |
+|                  |  +----------+                             |
+|                  |  | DISTINCT |                             |
 |  ----------      |                                            |
 |  [Save Query]    +==============[ Execute ][ Export Excel ]===+
 |  [Load Query]    |  [Derived Query] [Results Grid]            |
@@ -148,15 +173,20 @@ AVAQueryBuilder/
 ├── AddTableSourceDialog.axaml/.cs        — Table/view and column selection
 ├── AddConnectedSourceDialog.axaml/.cs    — Lookup join configuration
 ├── AddDerivedDialog.axaml/.cs            — Derived field dialog
+├── AddGroupByDialog.axaml/.cs            — GROUP BY and aggregate dialog
 ├── AddLimiterDialog.axaml/.cs            — TOP N limiter dialog
 ├── AddFilterDialog.axaml/.cs             — WHERE clause builder
 ├── AddSortingDialog.axaml/.cs            — ORDER BY builder
+├── FieldBrowserDialog.axaml/.cs          — Table data browser (TOP 100)
 ├── UnderConstructionWindow.axaml/.cs     — Placeholder dialog
 ├── TableSourceResult.cs                  — Table entity metadata
 ├── ConnectedSourceResult.cs              — Lookup entity metadata
 ├── DerivedFieldResult.cs                 — Derived field metadata
 ├── DerivedFieldViewModel.cs              — Derived field row view model
+├── GroupByResult.cs                      — Group By entity metadata
+├── AggregateViewModel.cs                 — Aggregate/HAVING row view models
 ├── LimiterResult.cs                      — Limiter entity metadata
+├── DistinctResult.cs                     — Distinct entity metadata
 ├── FilterResult.cs                       — Filter entity metadata
 ├── FilterConditionViewModel.cs           — Filter condition row view model
 ├── SortingResult.cs                      — Sorting entity metadata

@@ -46,6 +46,11 @@ public static class QueryBuilder
 
         var isDistinct = entityList.Any(e => e.Metadata is DistinctResult);
 
+        var groupBy = entityList
+            .Where(e => e.Metadata is GroupByResult)
+            .Select(e => (GroupByResult)e.Metadata!)
+            .FirstOrDefault();
+
         if (tableSources.Count == 0)
             return string.Empty;
 
@@ -60,44 +65,88 @@ public static class QueryBuilder
         if (limiter != null)
             sb.Append($"TOP {limiter.TopCount} ");
 
-        // Columns from table sources
         var allColumns = new List<string>();
-        foreach (var table in tableSources)
+
+        if (groupBy != null)
         {
-            var prefix = (tableSources.Count > 1 || lookups.Count > 0)
-                ? $"{table.TableName}."
-                : "";
-            foreach (var col in table.SelectedColumns)
+            // GROUP BY mode: select grouped fields + aggregate expressions
+            // Check derived fields for aliases on grouped expressions
+            foreach (var gf in groupBy.GroupFields)
             {
-                var colExpr = $"{prefix}{col}";
-                if (table.ColumnAliases.TryGetValue(col, out var colAlias) && !string.IsNullOrWhiteSpace(colAlias))
-                    colExpr += $" AS [{colAlias}]";
+                var colExpr = gf;
+                if (derived != null)
+                {
+                    var matchingDerived = derived.Fields.FirstOrDefault(df =>
+                        DerivedFieldViewModel.ToSqlExpression(df.SourceField, df.Derivation, df.Parameter) == gf);
+                    if (matchingDerived != null && !string.IsNullOrWhiteSpace(matchingDerived.Alias))
+                        colExpr += $" AS [{matchingDerived.Alias}]";
+                }
                 allColumns.Add(colExpr);
             }
-        }
 
-        // Columns from lookup joins
-        foreach (var lookup in lookups)
-        {
-            var tableAlias = $"LOOKUP_{lookup.OrdinalValue}";
-            foreach (var col in lookup.ReturnFields)
+            foreach (var agg in groupBy.Aggregates)
             {
-                var colExpr = $"{tableAlias}.{col}";
-                if (lookup.ColumnAliases.TryGetValue(col, out var colAlias) && !string.IsNullOrWhiteSpace(colAlias))
-                    colExpr += $" AS [{colAlias}]";
-                allColumns.Add(colExpr);
-            }
-        }
-
-        // Derived field expressions
-        if (derived != null)
-        {
-            foreach (var df in derived.Fields)
-            {
-                var expr = DerivedFieldViewModel.ToSqlExpression(df.SourceField, df.Derivation, df.Parameter);
-                if (!string.IsNullOrWhiteSpace(df.Alias))
-                    expr += $" AS [{df.Alias}]";
+                var expr = FormatAggregate(agg);
+                if (!string.IsNullOrWhiteSpace(agg.Alias))
+                    expr += $" AS [{agg.Alias}]";
                 allColumns.Add(expr);
+            }
+
+            // Add derived fields not already included via group fields
+            if (derived != null)
+            {
+                foreach (var df in derived.Fields)
+                {
+                    var expr = DerivedFieldViewModel.ToSqlExpression(df.SourceField, df.Derivation, df.Parameter);
+                    if (!groupBy.GroupFields.Contains(expr))
+                    {
+                        if (!string.IsNullOrWhiteSpace(df.Alias))
+                            expr += $" AS [{df.Alias}]";
+                        allColumns.Add(expr);
+                    }
+                }
+            }
+        }
+        else
+        {
+            // Normal mode: columns from table sources
+            foreach (var table in tableSources)
+            {
+                var prefix = (tableSources.Count > 1 || lookups.Count > 0)
+                    ? $"{table.TableName}."
+                    : "";
+                foreach (var col in table.SelectedColumns)
+                {
+                    var colExpr = $"{prefix}{col}";
+                    if (table.ColumnAliases.TryGetValue(col, out var colAlias) && !string.IsNullOrWhiteSpace(colAlias))
+                        colExpr += $" AS [{colAlias}]";
+                    allColumns.Add(colExpr);
+                }
+            }
+
+            // Columns from lookup joins
+            foreach (var lookup in lookups)
+            {
+                var tableAlias = $"LOOKUP_{lookup.OrdinalValue}";
+                foreach (var col in lookup.ReturnFields)
+                {
+                    var colExpr = $"{tableAlias}.{col}";
+                    if (lookup.ColumnAliases.TryGetValue(col, out var colAlias) && !string.IsNullOrWhiteSpace(colAlias))
+                        colExpr += $" AS [{colAlias}]";
+                    allColumns.Add(colExpr);
+                }
+            }
+
+            // Derived field expressions
+            if (derived != null)
+            {
+                foreach (var df in derived.Fields)
+                {
+                    var expr = DerivedFieldViewModel.ToSqlExpression(df.SourceField, df.Derivation, df.Parameter);
+                    if (!string.IsNullOrWhiteSpace(df.Alias))
+                        expr += $" AS [{df.Alias}]";
+                    allColumns.Add(expr);
+                }
             }
         }
 
@@ -140,6 +189,26 @@ public static class QueryBuilder
             AppendWrappedList(sb, whereParts, "      ", combiner);
         }
 
+        // GROUP BY clause
+        if (groupBy != null && groupBy.GroupFields.Count > 0)
+        {
+            sb.AppendLine();
+            sb.Append("GROUP BY ");
+            AppendWrappedList(sb, groupBy.GroupFields, "         ");
+
+            // HAVING clause
+            if (groupBy.HavingConditions.Count > 0)
+            {
+                sb.AppendLine();
+                sb.Append("HAVING ");
+                var havingParts = groupBy.HavingConditions
+                    .Select(h => $"{h.Expression} {h.Operator} {h.Value}")
+                    .ToList();
+                var havingCombiner = $" {groupBy.HavingCombiner} ";
+                AppendWrappedList(sb, havingParts, "       ", havingCombiner);
+            }
+        }
+
         // ORDER BY clause
         if (sorting != null && sorting.Fields.Count > 0)
         {
@@ -153,6 +222,16 @@ public static class QueryBuilder
         }
 
         return sb.ToString();
+    }
+
+    private static string FormatAggregate(AggregateField agg)
+    {
+        return agg.Function switch
+        {
+            "COUNT(*)" => "COUNT(*)",
+            "COUNT DISTINCT" => $"COUNT(DISTINCT {agg.Field})",
+            _ => $"{agg.Function}({agg.Field})"
+        };
     }
 
     private static string? FormatCondition(FilterCondition c)
