@@ -162,7 +162,8 @@ public static class QueryBuilder
         {
             var alias = $"LOOKUP_{lookup.OrdinalValue}";
             sb.AppendLine();
-            sb.Append($"LEFT JOIN {lookup.LookupTableName} AS {alias}");
+            var joinType = string.IsNullOrWhiteSpace(lookup.JoinType) ? "LEFT JOIN" : lookup.JoinType;
+            sb.Append($"{joinType} {lookup.LookupTableName} AS {alias}");
             sb.Append(" ON ");
 
             var joinConditions = lookup.JoinFieldsFromSource

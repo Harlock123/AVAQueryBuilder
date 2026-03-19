@@ -106,7 +106,9 @@ public partial class MainWindow : Window
                 var returnList = string.Join(", ", c.ReturnFields.Take(6));
                 if (c.ReturnFields.Count > 6)
                     returnList += $" ... +{c.ReturnFields.Count - 6} more";
+                var joinType = string.IsNullOrWhiteSpace(c.JoinType) ? "LEFT JOIN" : c.JoinType;
                 var cSummary = $"Lookup: {c.LookupTableName}\n" +
+                               $"Type: {joinType}\n" +
                                $"Alias: LOOKUP_{c.OrdinalValue}\n" +
                                $"Join: {joinFields} = {c.JoinFieldInLookup}\n" +
                                $"Returns ({c.ReturnFields.Count}): {returnList}";

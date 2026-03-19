@@ -6,10 +6,28 @@
         Width="950" Height="500"
         WindowStartupLocation="CenterOwner"
         CanResize="False">
-    <Grid Margin="16" RowDefinitions="*,Auto">
+    <Grid Margin="16" RowDefinitions="Auto,*,Auto">
+
+        <!-- Join type selector -->
+        <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="8" Margin="0,0,0,8">
+            <TextBlock Text="Join Type:" FontWeight="SemiBold" FontSize="12"
+                       VerticalAlignment="Center" />
+            <ComboBox x:Name="cboJoinType" Width="180" SelectedIndex="0">
+                <ComboBoxItem Content="LEFT JOIN" />
+                <ComboBoxItem Content="INNER JOIN" />
+                <ComboBoxItem Content="RIGHT JOIN" />
+                <ComboBoxItem Content="FULL OUTER JOIN" />
+            </ComboBox>
+            <Button Content="?" Width="28" Height="28" FontWeight="Bold"
+                    FontSize="13" Padding="0"
+                    Background="#3B82F6" Foreground="White"
+                    HorizontalContentAlignment="Center"
+                    VerticalContentAlignment="Center"
+                    Click="CmdJoinHelp_Click" />
+        </StackPanel>
 
         <!-- Four columns of listboxes -->
-        <Grid Grid.Row="0" ColumnDefinitions="*,*,*,*">
+        <Grid Grid.Row="1" ColumnDefinitions="*,*,*,*">
 
             <!-- Column 1: Fields from source table -->
             <Grid Grid.Column="0" RowDefinitions="Auto,*" Margin="0,0,4,0">
@@ -91,7 +109,7 @@
         </Grid>
 
         <!-- Status and buttons -->
-        <Grid Grid.Row="1" RowDefinitions="Auto,Auto" Margin="0,12,0,0">
+        <Grid Grid.Row="2" RowDefinitions="Auto,Auto" Margin="0,12,0,0">
             <TextBlock x:Name="txtStatus" Grid.Row="0" FontSize="10"
                        Foreground="Gray" Margin="0,0,0,8" />
             <StackPanel Grid.Row="1" Orientation="Horizontal"

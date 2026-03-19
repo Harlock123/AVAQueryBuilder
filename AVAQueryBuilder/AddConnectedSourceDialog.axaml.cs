@@ -53,6 +53,17 @@ public partial class AddConnectedSourceDialog : Window
         _isRehydrating = true;
         var existing = ExistingResult!;
 
+        // Restore join type
+        var joinType = existing.JoinType ?? "LEFT JOIN";
+        for (var i = 0; i < cboJoinType.ItemCount; i++)
+        {
+            if (cboJoinType.Items[i] is ComboBoxItem item && item.Content?.ToString() == joinType)
+            {
+                cboJoinType.SelectedIndex = i;
+                break;
+            }
+        }
+
         // Restore source field selections
         foreach (var col in _sourceFields)
             col.IsSelected = existing.JoinFieldsFromSource.Contains(col.Name);
@@ -195,6 +206,12 @@ public partial class AddConnectedSourceDialog : Window
             _returnFields.Add(new ColumnItem { Name = col, IsSelected = false });
     }
 
+    private void CmdJoinHelp_Click(object? sender, RoutedEventArgs e)
+    {
+        var help = new JoinTypesHelpWindow();
+        help.ShowDialog(this);
+    }
+
     private void CmdFieldBrowser_Click(object? sender, RoutedEventArgs e)
     {
         if (lstLookupTables.SelectedItem is not string selected)
@@ -240,12 +257,15 @@ public partial class AddConnectedSourceDialog : Window
             .Where(c => c.IsSelected && !string.IsNullOrWhiteSpace(c.Alias))
             .ToDictionary(c => c.Name, c => c.Alias);
 
+        var selectedJoinType = (cboJoinType.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "LEFT JOIN";
+
         Result = new ConnectedSourceResult
         {
             SourceTableName = SourceTable.TableName,
             JoinFieldsFromSource = joinFromSource,
             LookupTableName = ExtractTableName(selectedLookup),
             JoinFieldInLookup = joinField,
+            JoinType = selectedJoinType,
             ReturnFields = returnFields,
             ColumnAliases = aliases,
             OrdinalValue = OrdinalValue

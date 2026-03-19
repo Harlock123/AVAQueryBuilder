@@ -22,7 +22,7 @@ Entities are added to an interactive canvas ([AVASdCanvas](https://github.com/ha
 | Entity Type | Color | Description |
 |---|---|---|
 | **Table Source** | Light Green | A base table or view to SELECT from. Choose specific columns with optional aliases. |
-| **Connected Source (Lookup)** | Light Purple | A LEFT JOIN to another table. Specify join keys and return fields with optional aliases. Aliased as `LOOKUP_1`, `LOOKUP_2`, etc. |
+| **Connected Source (Lookup)** | Light Purple | A join to another table. Supports LEFT JOIN, INNER JOIN, RIGHT JOIN, and FULL OUTER JOIN via a dropdown selector. Specify join keys and return fields with optional aliases. Aliased as `LOOKUP_1`, `LOOKUP_2`, etc. Includes a blue **?** help button with a color-coded reference explaining each join type. |
 | **Derived Field** | Light Mint | Computed columns using derivations like UPPER, LOWER, DATEPART, LEN, LEFT, RIGHT, ROUND, TRIM, REVERSE, ABS, CEILING, FLOOR, and more. Each derived field requires an alias. Some derivations accept a parameter (e.g., Left N Chars, Round to N Decimals). |
 | **Group By** | Rose Pink | GROUP BY with aggregate functions (COUNT, COUNT(*), COUNT DISTINCT, SUM, AVG, MIN, MAX). Includes optional HAVING clause with AND/OR conditions. Supports grouping by derived field expressions. When active, replaces the normal column list with grouped fields and aggregates. |
 | **Limiter** | Light Red | Adds a `TOP N` clause to the query. Toggle button — click to add, click again to remove. |
@@ -105,6 +105,9 @@ The generated SQL is displayed using the [SyntaxColorizer](https://github.com/Ha
 ### Add Connected Source Dialog (Lookup Join) — with Column Aliases
 ![Add Connected Source Dialog](Screenshots/SS4.png)
 
+### Join Types Reference — accessed via the blue ? button
+![Join Types Reference](Screenshots/SS7.png)
+
 ### Add Derived Field Dialog — DATEPART Derivations
 ![Add Derived Field Dialog](Screenshots/SS5.png)
 
@@ -178,6 +181,7 @@ AVAQueryBuilder/
 ├── AddFilterDialog.axaml/.cs             — WHERE clause builder
 ├── AddSortingDialog.axaml/.cs            — ORDER BY builder
 ├── FieldBrowserDialog.axaml/.cs          — Table data browser (TOP 100)
+├── JoinTypesHelpWindow.axaml/.cs         — Join type reference dialog
 ├── UnderConstructionWindow.axaml/.cs     — Placeholder dialog
 ├── TableSourceResult.cs                  — Table entity metadata
 ├── ConnectedSourceResult.cs              — Lookup entity metadata

@@ -1,0 +1,62 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="AVAQueryBuilder.JoinTypesHelpWindow"
+        Title="SQL Join Types Reference"
+        Width="650" Height="520"
+        WindowStartupLocation="CenterOwner"
+        CanResize="False">
+    <ScrollViewer Margin="20">
+        <StackPanel Spacing="16">
+
+            <TextBlock Text="SQL Join Types" FontSize="18" FontWeight="Bold" Foreground="Black" />
+
+            <Border Background="#E8F5E9" BorderBrush="#4CAF50" BorderThickness="1"
+                    CornerRadius="4" Padding="12">
+                <StackPanel Spacing="4">
+                    <TextBlock Text="LEFT JOIN (default)" FontWeight="Bold" FontSize="14" Foreground="Black" />
+                    <TextBlock TextWrapping="Wrap" FontSize="12" Foreground="Black"
+                               Text="Returns ALL rows from the source (left) table and matching rows from the lookup (right) table. If no match exists, the lookup columns contain NULL. Use when you want to keep all source records even if they have no match." />
+                    <TextBlock Text="Example: All employees, with their department name if assigned"
+                               FontStyle="Italic" FontSize="11" Foreground="#555555" />
+                </StackPanel>
+            </Border>
+
+            <Border Background="#E3F2FD" BorderBrush="#2196F3" BorderThickness="1"
+                    CornerRadius="4" Padding="12">
+                <StackPanel Spacing="4">
+                    <TextBlock Text="INNER JOIN" FontWeight="Bold" FontSize="14" Foreground="Black" />
+                    <TextBlock TextWrapping="Wrap" FontSize="12" Foreground="Black"
+                               Text="Returns ONLY rows that have a match in BOTH tables. Rows from the source table with no matching lookup row are excluded entirely. Use when you only want records that exist in both tables." />
+                    <TextBlock Text="Example: Only employees who are assigned to a department"
+                               FontStyle="Italic" FontSize="11" Foreground="#555555" />
+                </StackPanel>
+            </Border>
+
+            <Border Background="#FFF3E0" BorderBrush="#FF9800" BorderThickness="1"
+                    CornerRadius="4" Padding="12">
+                <StackPanel Spacing="4">
+                    <TextBlock Text="RIGHT JOIN" FontWeight="Bold" FontSize="14" Foreground="Black" />
+                    <TextBlock TextWrapping="Wrap" FontSize="12" Foreground="Black"
+                               Text="Returns ALL rows from the lookup (right) table and matching rows from the source (left) table. If no match exists, the source columns contain NULL. The reverse of LEFT JOIN. Use when you want all lookup records even if no source record references them." />
+                    <TextBlock Text="Example: All departments, including those with no employees"
+                               FontStyle="Italic" FontSize="11" Foreground="#555555" />
+                </StackPanel>
+            </Border>
+
+            <Border Background="#FCE4EC" BorderBrush="#E91E63" BorderThickness="1"
+                    CornerRadius="4" Padding="12">
+                <StackPanel Spacing="4">
+                    <TextBlock Text="FULL OUTER JOIN" FontWeight="Bold" FontSize="14" Foreground="Black" />
+                    <TextBlock TextWrapping="Wrap" FontSize="12" Foreground="Black"
+                               Text="Returns ALL rows from BOTH tables. Where a match exists, columns from both tables are populated. Where no match exists on either side, the missing columns contain NULL. Use when you need a complete picture of both tables regardless of matches." />
+                    <TextBlock Text="Example: All employees and all departments, matched where possible"
+                               FontStyle="Italic" FontSize="11" Foreground="#555555" />
+                </StackPanel>
+            </Border>
+
+            <StackPanel HorizontalAlignment="Right">
+                <Button Content="Close" Width="80" Click="CmdClose_Click" />
+            </StackPanel>
+        </StackPanel>
+    </ScrollViewer>
+</Window>
