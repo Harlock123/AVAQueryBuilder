@@ -23,7 +23,7 @@ Entities are added to an interactive canvas ([AVASdCanvas](https://github.com/ha
 |---|---|---|
 | **Table Source** | Light Green | A base table or view to SELECT from. Choose specific columns with optional aliases. |
 | **Connected Source (Lookup)** | Light Purple | A join to another table. Supports LEFT JOIN, INNER JOIN, RIGHT JOIN, and FULL OUTER JOIN via a dropdown selector. Specify join keys and return fields with optional aliases. Aliased as `LOOKUP_1`, `LOOKUP_2`, etc. Includes a blue **?** help button with a color-coded reference explaining each join type. |
-| **Derived Field** | Light Mint | Computed columns using derivations like UPPER, LOWER, DATEPART, LEN, LEFT, RIGHT, ROUND, TRIM, REVERSE, ABS, CEILING, FLOOR, and more. Each derived field requires an alias. Some derivations accept a parameter (e.g., Left N Chars, Round to N Decimals). |
+| **Derived Field** | Light Mint | Computed columns with 25+ derivations. **String:** UPPER, LOWER, TRIM, LEN, LEFT N, RIGHT N, REVERSE. **Date:** DATEPART (Year/Month/Day/Hour), DATENAME (Month/Day), Date Only, DATEDIFF (Days/Months/Years), DATEADD (Days/Months/Years). **Null handling:** ISNULL (Default), COALESCE (Fallback). **Numeric:** ABS, ROUND, CEILING, FLOOR. Each derived field requires an alias. |
 | **Group By** | Rose Pink | GROUP BY with aggregate functions (COUNT, COUNT(*), COUNT DISTINCT, SUM, AVG, MIN, MAX). Includes optional HAVING clause with AND/OR conditions. Supports grouping by derived field expressions. When active, replaces the normal column list with grouped fields and aggregates. |
 | **Limiter** | Light Red | Adds a `TOP N` clause to the query. Toggle button — click to add, click again to remove. |
 | **Distinct** | Light Orange | Adds `SELECT DISTINCT` to eliminate duplicate rows. Toggle button — no dialog needed. |
@@ -80,7 +80,10 @@ The generated SQL updates live as entities are added, edited, or removed. Long l
 
 - **Execute Query** button runs the generated SQL against the connected database.
 - Results are displayed in an integrated data grid ([LAWgrid](https://github.com/harlock123/LAWgrid)) with the Results Grid tab automatically selected.
+- **Status bar** displays row count and execution time after each query (e.g., "Returned 1,247 row(s) in 0.3s").
+- **Copy SQL** button copies the generated query text to the clipboard.
 - **Export to Excel** button exports the current results grid to an Excel file (`.xlsx`) with full formatting via a save file dialog.
+- **Clear Canvas** button resets all entities, connectors, query text, and results grid in one click.
 
 ### Syntax Highlighting
 
@@ -134,10 +137,12 @@ The generated SQL is displayed using the [SyntaxColorizer](https://github.com/Ha
 |                  |  +----------+                             |
 |                  |  | DISTINCT |                             |
 |  ----------      |                                            |
-|  [Save Query]    +==============[ Execute ][ Export Excel ]===+
-|  [Load Query]    |  [Derived Query] [Results Grid]            |
-|                  |  SELECT TOP 100 col1 AS [Name], ...        |
-|                  |  FROM dbo.Table LEFT JOIN ...              |
+|  [Clear Canvas]  +==========[ Copy SQL ][ Execute ][ Export ]=+
+|  [Save Query]    |  [Derived Query] [Results Grid]            |
+|  [Load Query]    |  SELECT TOP 100 col1 AS [Name], ...        |
+|                  |  FROM dbo.Table INNER JOIN ...             |
+|                  +--------------------------------------------+
+|                  |  Returned 1,247 row(s) in 0.3s             |
 +------------------+--------------------------------------------+
 ```
 

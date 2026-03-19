@@ -29,6 +29,15 @@ public class DerivedFieldViewModel : INotifyPropertyChanged
         "Month Name",
         "Day Name",
         "Date Only",
+        "DATEDIFF (Days)",
+        "DATEDIFF (Months)",
+        "DATEDIFF (Years)",
+        "DATEADD (Days)",
+        "DATEADD (Months)",
+        "DATEADD (Years)",
+        // Null handling
+        "ISNULL (Default)",
+        "COALESCE (Fallback)",
         // Numeric
         "Absolute Value",
         "Round to N Decimals",
@@ -40,7 +49,15 @@ public class DerivedFieldViewModel : INotifyPropertyChanged
     {
         "Left N Chars",
         "Right N Chars",
-        "Round to N Decimals"
+        "Round to N Decimals",
+        "DATEDIFF (Days)",
+        "DATEDIFF (Months)",
+        "DATEDIFF (Years)",
+        "DATEADD (Days)",
+        "DATEADD (Months)",
+        "DATEADD (Years)",
+        "ISNULL (Default)",
+        "COALESCE (Fallback)"
     };
 
     public List<string> AvailableFields { get; set; } = new();
@@ -105,6 +122,14 @@ public class DerivedFieldViewModel : INotifyPropertyChanged
             "Month Name" => $"DATENAME(MONTH, {field})",
             "Day Name" => $"DATENAME(WEEKDAY, {field})",
             "Date Only" => $"CAST({field} AS DATE)",
+            "DATEDIFF (Days)" => $"DATEDIFF(DAY, {field}, {parameter})",
+            "DATEDIFF (Months)" => $"DATEDIFF(MONTH, {field}, {parameter})",
+            "DATEDIFF (Years)" => $"DATEDIFF(YEAR, {field}, {parameter})",
+            "DATEADD (Days)" => $"DATEADD(DAY, {parameter}, {field})",
+            "DATEADD (Months)" => $"DATEADD(MONTH, {parameter}, {field})",
+            "DATEADD (Years)" => $"DATEADD(YEAR, {parameter}, {field})",
+            "ISNULL (Default)" => $"ISNULL({field}, '{parameter}')",
+            "COALESCE (Fallback)" => $"COALESCE({field}, {parameter})",
             "Absolute Value" => $"ABS({field})",
             "Round to N Decimals" => $"ROUND({field}, {parameter})",
             "Ceiling" => $"CEILING({field})",

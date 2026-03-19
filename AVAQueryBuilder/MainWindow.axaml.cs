@@ -832,6 +832,40 @@ public partial class MainWindow : Window
         RebuildQuery();
     }
 
+    private async void CmdCopySql_Click(object? sender, RoutedEventArgs e)
+    {
+        var query = TheQuery.Text;
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            txtStatusBar.Text = "No query to copy.";
+            return;
+        }
+
+        try
+        {
+            var clipboard = GetTopLevel(this)?.Clipboard;
+            if (clipboard != null)
+            {
+                await clipboard.SetTextAsync(query);
+                txtStatusBar.Text = "SQL copied to clipboard.";
+            }
+        }
+        catch (Exception ex)
+        {
+            txtStatusBar.Text = $"Copy failed: {ex.Message}";
+        }
+    }
+
+    private void CmdClearCanvas_Click(object? sender, RoutedEventArgs e)
+    {
+        QCanvas.Clear();
+        _lookupOrdinal = 0;
+        TheQuery.Text = string.Empty;
+        QResultsGrid.PopulateFromDataTable(new System.Data.DataTable());
+        txtStatusBar.Text = "Canvas cleared.";
+        UpdateConnectedSourceButtonState();
+    }
+
     private async void CmdExecuteQuery_Click(object? sender, RoutedEventArgs e)
     {
         var query = TheQuery.Text;
@@ -847,14 +881,20 @@ public partial class MainWindow : Window
         {
             cmdExecuteQuery.IsEnabled = false;
             cmdExecuteQuery.Content = "Executing...";
+            txtStatusBar.Text = "Executing query...";
 
-            await QResultsGrid.PopulateFromSqlQueryAsync(connStr, query);
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            var result = await QResultsGrid.PopulateFromSqlQueryAsync(connStr, query);
+            sw.Stop();
+
+            txtStatusBar.Text = $"Returned {result.RowCount:N0} row(s) in {sw.Elapsed.TotalSeconds:F1}s";
 
             // Switch to the Results Grid tab
             tabResultsGrid.IsSelected = true;
         }
         catch (Exception ex)
         {
+            txtStatusBar.Text = $"Query failed: {ex.Message}";
             ShowUnderConstruction($"Query failed: {ex.Message}");
         }
         finally

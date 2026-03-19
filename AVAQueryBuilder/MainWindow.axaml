@@ -30,6 +30,7 @@
                 </StackPanel>
                 <StackPanel Grid.Row="1" Spacing="4" Margin="0,8,0,0">
                     <Separator />
+                    <Button x:Name="cmdClearCanvas" Content="Clear Canvas" HorizontalAlignment="Stretch" Click="CmdClearCanvas_Click" />
                     <Button x:Name="cmdSaveQuery" Content="Save Query" HorizontalAlignment="Stretch" Click="CmdSaveQuery_Click" />
                     <Button x:Name="cmdLoadQuery" Content="Load Query" HorizontalAlignment="Stretch" Click="CmdLoadQuery_Click" />
                 </StackPanel>
@@ -66,9 +67,12 @@
                           Background="DarkGray" />
 
             <!-- Bottom region - TabControl with Execute button -->
-            <Grid Grid.Row="4" RowDefinitions="Auto,*">
+            <Grid Grid.Row="4" RowDefinitions="Auto,*,Auto">
                 <StackPanel Grid.Row="0" Orientation="Horizontal"
                             HorizontalAlignment="Right" Spacing="8" Margin="0,2,4,0">
+                    <Button x:Name="cmdCopySql" Content="Copy SQL"
+                            Background="#3B82F6" Foreground="White" FontSize="11"
+                            Padding="12,4" Click="CmdCopySql_Click" />
                     <Button x:Name="cmdExecuteQuery" Content="Execute Query"
                             Background="#3B82F6" Foreground="White" FontSize="11"
                             Padding="12,4" Click="CmdExecuteQuery_Click" />
@@ -97,6 +101,11 @@
                         <lawgrid:LAWgrid x:Name="QResultsGrid" />
                     </TabItem>
                 </TabControl>
+                <Border Grid.Row="2" BorderBrush="Gray" BorderThickness="0,1,0,0"
+                        Padding="4,2" Background="#FFFDE8">
+                    <TextBlock x:Name="txtStatusBar" FontSize="11" Foreground="Black"
+                               Text="Ready" />
+                </Border>
             </Grid>
 
         </Grid>
