@@ -1109,34 +1109,21 @@ public partial class MainWindow : Window
             Lookups = lookups
         };
 
-        // Pre-populate if filter already exists
-        var existingFilterEntity = QCanvas.Entities.FirstOrDefault(ent => ent.Metadata is FilterResult);
-        if (existingFilterEntity?.Metadata is FilterResult existing)
-            dialog.ExistingResult = existing;
-
         var result = await dialog.ShowDialog<bool?>(this);
         if (result == true && dialog.Result != null)
         {
-            // Remove existing filter and its connectors
-            var oldFilter = QCanvas.Entities.FirstOrDefault(ent => ent.Metadata is FilterResult);
-            if (oldFilter != null)
-            {
-                var oldConnectors = QCanvas.Connectors
-                    .Where(c => c.SourceEntityId == oldFilter.Id || c.TargetEntityId == oldFilter.Id)
-                    .ToList();
-                foreach (var c in oldConnectors)
-                    QCanvas.RemoveConnector(c);
-                QCanvas.RemoveEntity(oldFilter);
-            }
+            // Count existing filter entities for labeling
+            var filterCount = QCanvas.Entities.Count(ent => ent.Metadata is FilterResult) + 1;
 
-            // Position: next slot after lookups and limiter
+            // Position: next right-side slot
             var rightSideCount = QCanvas.Entities
-                .Count(ent => ent.Metadata is ConnectedSourceResult or LimiterResult);
+                .Count(ent => ent.Metadata is ConnectedSourceResult or LimiterResult or FilterResult
+                    or SortingResult or DerivedFieldResult or CaseWhenResult or GroupByResult);
             var xPos = tableEntity.X + tableEntity.Width + 60;
             var yPos = tableEntity.Y + (rightSideCount * 55);
 
             var filterEntity = QCanvas.AddEntity(
-                label: $"WHERE ({dialog.Result.Conditions.Count})",
+                label: $"WHERE #{filterCount} ({dialog.Result.Conditions.Count})",
                 x: xPos,
                 y: yPos,
                 width: 160,

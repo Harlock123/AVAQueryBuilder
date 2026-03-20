@@ -29,10 +29,10 @@ public static class QueryBuilder
             .Select(e => (LimiterResult)e.Metadata!)
             .FirstOrDefault();
 
-        var filter = entityList
+        var filters = entityList
             .Where(e => e.Metadata is FilterResult)
             .Select(e => (FilterResult)e.Metadata!)
-            .FirstOrDefault();
+            .ToList();
 
         var sorting = entityList
             .Where(e => e.Metadata is SortingResult)
@@ -198,22 +198,37 @@ public static class QueryBuilder
             sb.Append(string.Join(" AND ", joinConditions));
         }
 
-        // WHERE clause
-        if (filter != null && filter.Conditions.Count > 0)
+        // WHERE clause — multiple filter entities, each wrapped in parentheses, AND'd together
+        var activeFilters = filters.Where(f => f.Conditions.Count > 0).ToList();
+        if (activeFilters.Count > 0)
         {
             sb.AppendLine();
             sb.Append("WHERE ");
 
-            var whereParts = new List<string>();
-            foreach (var c in filter.Conditions)
+            var filterGroups = new List<string>();
+            foreach (var filter in activeFilters)
             {
-                var clause = FormatCondition(c);
-                if (clause != null)
-                    whereParts.Add(clause);
+                var whereParts = new List<string>();
+                foreach (var c in filter.Conditions)
+                {
+                    var clause = FormatCondition(c);
+                    if (clause != null)
+                        whereParts.Add(clause);
+                }
+
+                if (whereParts.Count == 0) continue;
+
+                var combiner = $" {filter.Combiner} ";
+                var group = string.Join(combiner, whereParts);
+
+                // Wrap in parentheses if multiple filters exist
+                if (activeFilters.Count > 1)
+                    group = $"({group})";
+
+                filterGroups.Add(group);
             }
 
-            var combiner = $" {filter.Combiner} ";
-            AppendWrappedList(sb, whereParts, "      ", combiner);
+            AppendWrappedList(sb, filterGroups, "      ", " AND ");
         }
 
         // GROUP BY clause
