@@ -86,6 +86,13 @@ public static class QueryBuilder
                     if (matchingDerived != null && !string.IsNullOrWhiteSpace(matchingDerived.Alias))
                         colExpr += $" AS [{matchingDerived.Alias}]";
                 }
+                if (caseWhen != null)
+                {
+                    var matchingCase = caseWhen.Expressions.FirstOrDefault(ce =>
+                        FormatCaseExpressionNoAlias(ce) == gf);
+                    if (matchingCase != null && !string.IsNullOrWhiteSpace(matchingCase.Alias))
+                        colExpr += $" AS [{matchingCase.Alias}]";
+                }
                 allColumns.Add(colExpr);
             }
 
@@ -155,11 +162,15 @@ public static class QueryBuilder
             }
         }
 
-        // CASE/WHEN expressions
+        // CASE/WHEN expressions (skip if already included via group fields)
         if (caseWhen != null)
         {
             foreach (var expr in caseWhen.Expressions)
             {
+                var caseSqlNoAlias = FormatCaseExpressionNoAlias(expr);
+                // Check if this CASE expression is already in allColumns (via group fields)
+                if (allColumns.Any(c => c.StartsWith(caseSqlNoAlias)))
+                    continue;
                 var caseSql = FormatCaseExpression(expr);
                 allColumns.Add(caseSql);
             }
@@ -237,6 +248,24 @@ public static class QueryBuilder
             AppendWrappedList(sb, orderParts, "         ");
         }
 
+        return sb.ToString();
+    }
+
+    private static string FormatCaseExpressionNoAlias(CaseExpression expr)
+    {
+        var sb = new System.Text.StringBuilder("CASE");
+        foreach (var wt in expr.Conditions)
+        {
+            if (wt.Operator is "IS NULL")
+                sb.Append($" WHEN {expr.Field} IS NULL THEN '{wt.ThenValue}'");
+            else if (wt.Operator is "IS NOT NULL")
+                sb.Append($" WHEN {expr.Field} IS NOT NULL THEN '{wt.ThenValue}'");
+            else
+                sb.Append($" WHEN {expr.Field} {wt.Operator} '{wt.WhenValue}' THEN '{wt.ThenValue}'");
+        }
+        if (!string.IsNullOrWhiteSpace(expr.ElseValue))
+            sb.Append($" ELSE '{expr.ElseValue}'");
+        sb.Append(" END");
         return sb.ToString();
     }
 

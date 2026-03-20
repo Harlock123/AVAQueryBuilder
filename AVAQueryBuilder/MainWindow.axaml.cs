@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Media;
@@ -373,6 +374,7 @@ public partial class MainWindow : Window
                 entity.Label = $"CASE/WHEN ({dialog.Result.Expressions.Count})";
                 entity.Metadata = dialog.Result;
                 RebuildQuery();
+                await WarnGroupByIfNeeded();
             }
         }
         else if (entity.Metadata is GroupByResult existingGroupBy)
@@ -767,7 +769,51 @@ public partial class MainWindow : Window
             );
 
             RebuildQuery();
+            await WarnGroupByIfNeeded();
         }
+    }
+
+    private async Task WarnGroupByIfNeeded()
+    {
+        var hasGroupBy = QCanvas.Entities.Any(ent => ent.Metadata is GroupByResult);
+        if (!hasGroupBy) return;
+
+        var dialog = new Window
+        {
+            Title = "Group By Notice",
+            Width = 420,
+            Height = 160,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            CanResize = false
+        };
+
+        var okButton = new Button { Content = "OK", Width = 80 };
+        okButton.Click += (_, _) => dialog.Close();
+
+        dialog.Content = new StackPanel
+        {
+            Margin = new Avalonia.Thickness(16),
+            Spacing = 12,
+            Children =
+            {
+                new TextBlock
+                {
+                    Text = "A Group By entity is present on the canvas. The CASE/WHEN expression " +
+                           "you just added or edited may need to be included in the Group By fields " +
+                           "for the query to be valid. Please review the Group By configuration.",
+                    TextWrapping = TextWrapping.Wrap,
+                    FontSize = 12
+                },
+                new StackPanel
+                {
+                    Orientation = Avalonia.Layout.Orientation.Horizontal,
+                    HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right,
+                    Children = { okButton }
+                }
+            }
+        };
+
+        await dialog.ShowDialog(this);
     }
 
     private async void CmdAddGroupBy_Click(object? sender, RoutedEventArgs e)
