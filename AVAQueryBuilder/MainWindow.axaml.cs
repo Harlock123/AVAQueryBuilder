@@ -32,6 +32,8 @@ public partial class MainWindow : Window
     private static readonly SolidColorBrush DerivedStroke = new(Color.Parse("#2D8B70"));
     private static readonly SolidColorBrush DistinctFill = new(Color.Parse("#FDBA74"));
     private static readonly SolidColorBrush DistinctStroke = new(Color.Parse("#C2410C"));
+    private static readonly SolidColorBrush CaseWhenFill = new(Color.Parse("#94A3B8"));
+    private static readonly SolidColorBrush CaseWhenStroke = new(Color.Parse("#475569"));
     private static readonly SolidColorBrush GroupByFill = new(Color.Parse("#E879A8"));
     private static readonly SolidColorBrush GroupByStroke = new(Color.Parse("#9D174D"));
 
@@ -144,6 +146,15 @@ public partial class MainWindow : Window
                 var derivedLines = d.Fields.Select(df =>
                     $"  {DerivedFieldViewModel.ToSqlExpression(df.SourceField, df.Derivation, df.Parameter)} AS [{df.Alias}]");
                 return $"Derived Fields ({d.Fields.Count})\n{string.Join("\n", derivedLines)}";
+
+            case CaseWhenResult cw:
+                var caseLines = cw.Expressions.Select(expr =>
+                {
+                    var whenCount = expr.Conditions.Count;
+                    var elseStr = string.IsNullOrWhiteSpace(expr.ElseValue) ? "" : $", ELSE '{expr.ElseValue}'";
+                    return $"  {expr.Field} ({whenCount} when{(whenCount != 1 ? "s" : "")}{elseStr}) AS [{expr.Alias}]";
+                });
+                return $"CASE/WHEN ({cw.Expressions.Count})\n{string.Join("\n", caseLines)}";
 
             case GroupByResult g:
                 var gFields = string.Join(", ", g.GroupFields.Take(5));
@@ -290,11 +301,16 @@ public partial class MainWindow : Window
                 .FirstOrDefault(ent => ent.Metadata is GroupByResult)
                 ?.Metadata as GroupByResult;
 
+            var caseWhenResultSort = QCanvas.Entities
+                .FirstOrDefault(ent => ent.Metadata is CaseWhenResult)
+                ?.Metadata as CaseWhenResult;
+
             var dialog = new AddSortingDialog
             {
                 SourceTable = sourceTable,
                 Lookups = lookups,
                 DerivedFields = derivedResultSort,
+                CaseWhenFields = caseWhenResultSort,
                 GroupByFields = groupByResultSort,
                 ExistingResult = existingSorting
             };
@@ -333,6 +349,32 @@ public partial class MainWindow : Window
                 RebuildQuery();
             }
         }
+        else if (entity.Metadata is CaseWhenResult existingCaseWhen)
+        {
+            var tableEntity = QCanvas.Entities.FirstOrDefault(ent => ent.Metadata is TableSourceResult);
+            if (tableEntity?.Metadata is not TableSourceResult sourceTable) return;
+
+            var lookups = QCanvas.Entities
+                .Where(ent => ent.Metadata is ConnectedSourceResult)
+                .Select(ent => (ConnectedSourceResult)ent.Metadata!)
+                .OrderBy(l => l.OrdinalValue)
+                .ToList();
+
+            var dialog = new AddCaseWhenDialog
+            {
+                SourceTable = sourceTable,
+                Lookups = lookups,
+                ExistingResult = existingCaseWhen
+            };
+            var result = await dialog.ShowDialog<bool?>(this);
+            if (result == true && dialog.Result != null)
+            {
+                entity.Metadata = null;
+                entity.Label = $"CASE/WHEN ({dialog.Result.Expressions.Count})";
+                entity.Metadata = dialog.Result;
+                RebuildQuery();
+            }
+        }
         else if (entity.Metadata is GroupByResult existingGroupBy)
         {
             var tableEntity = QCanvas.Entities.FirstOrDefault(ent => ent.Metadata is TableSourceResult);
@@ -348,11 +390,16 @@ public partial class MainWindow : Window
                 .FirstOrDefault(ent => ent.Metadata is DerivedFieldResult)
                 ?.Metadata as DerivedFieldResult;
 
+            var caseWhenResult = QCanvas.Entities
+                .FirstOrDefault(ent => ent.Metadata is CaseWhenResult)
+                ?.Metadata as CaseWhenResult;
+
             var dialog = new AddGroupByDialog
             {
                 SourceTable = sourceTable,
                 Lookups = lookups,
                 DerivedFields = derivedResult,
+                CaseWhenFields = caseWhenResult,
                 ExistingResult = existingGroupBy
             };
             var result = await dialog.ShowDialog<bool?>(this);
@@ -377,6 +424,7 @@ public partial class MainWindow : Window
             SortingResult => "Sorting",
             DerivedFieldResult => "Derived Field",
             DistinctResult => "Distinct",
+            CaseWhenResult => "Case/When",
             GroupByResult => "Group By",
             _ => "Entity"
         };
@@ -469,6 +517,7 @@ public partial class MainWindow : Window
         var hasTable = QCanvas.Entities.Any(e => e.Metadata is TableSourceResult);
         cmdAddConnectedSource.IsEnabled = hasTable;
         cmdAddDerived.IsEnabled = hasTable;
+        cmdAddCaseWhen.IsEnabled = hasTable;
         cmdAddGroupBy.IsEnabled = hasTable;
         cmdAddLimiter.IsEnabled = hasTable;
         cmdToggleDistinct.IsEnabled = hasTable;
@@ -649,6 +698,78 @@ public partial class MainWindow : Window
         }
     }
 
+    private async void CmdAddCaseWhen_Click(object? sender, RoutedEventArgs e)
+    {
+        var tableEntity = QCanvas.Entities.FirstOrDefault(ent => ent.Metadata is TableSourceResult);
+        if (tableEntity?.Metadata is not TableSourceResult sourceTable)
+        {
+            ShowUnderConstruction("Add a Table Source first");
+            return;
+        }
+
+        var lookups = QCanvas.Entities
+            .Where(ent => ent.Metadata is ConnectedSourceResult)
+            .Select(ent => (ConnectedSourceResult)ent.Metadata!)
+            .OrderBy(l => l.OrdinalValue)
+            .ToList();
+
+        var dialog = new AddCaseWhenDialog
+        {
+            SourceTable = sourceTable,
+            Lookups = lookups
+        };
+
+        // Pre-populate if case/when already exists
+        var existingEntity = QCanvas.Entities.FirstOrDefault(ent => ent.Metadata is CaseWhenResult);
+        if (existingEntity?.Metadata is CaseWhenResult existing)
+            dialog.ExistingResult = existing;
+
+        var result = await dialog.ShowDialog<bool?>(this);
+        if (result == true && dialog.Result != null)
+        {
+            // Remove existing case/when and its connectors
+            var oldCaseWhen = QCanvas.Entities.FirstOrDefault(ent => ent.Metadata is CaseWhenResult);
+            if (oldCaseWhen != null)
+            {
+                var oldConnectors = QCanvas.Connectors
+                    .Where(c => c.SourceEntityId == oldCaseWhen.Id || c.TargetEntityId == oldCaseWhen.Id)
+                    .ToList();
+                foreach (var c in oldConnectors)
+                    QCanvas.RemoveConnector(c);
+                QCanvas.RemoveEntity(oldCaseWhen);
+            }
+
+            // Position
+            var rightSideCount = QCanvas.Entities
+                .Count(ent => ent.Metadata is ConnectedSourceResult or LimiterResult or FilterResult
+                    or SortingResult or DerivedFieldResult or GroupByResult);
+            var xPos = tableEntity.X + tableEntity.Width + 60;
+            var yPos = tableEntity.Y + (rightSideCount * 55);
+
+            var caseEntity = QCanvas.AddEntity(
+                label: $"CASE/WHEN ({dialog.Result.Expressions.Count})",
+                x: xPos,
+                y: yPos,
+                width: 160,
+                height: 40,
+                fill: CaseWhenFill,
+                stroke: CaseWhenStroke,
+                metadata: dialog.Result
+            );
+
+            QCanvas.AddConnector(
+                source: caseEntity,
+                target: tableEntity,
+                sourceEndpoint: EndpointStyle.RoundDot,
+                targetEndpoint: EndpointStyle.PointedArrow,
+                lineBrush: Brushes.SlateGray,
+                metadata: null
+            );
+
+            RebuildQuery();
+        }
+    }
+
     private async void CmdAddGroupBy_Click(object? sender, RoutedEventArgs e)
     {
         var tableEntity = QCanvas.Entities.FirstOrDefault(ent => ent.Metadata is TableSourceResult);
@@ -668,11 +789,16 @@ public partial class MainWindow : Window
             .FirstOrDefault(ent => ent.Metadata is DerivedFieldResult)
             ?.Metadata as DerivedFieldResult;
 
+        var caseWhenResult = QCanvas.Entities
+            .FirstOrDefault(ent => ent.Metadata is CaseWhenResult)
+            ?.Metadata as CaseWhenResult;
+
         var dialog = new AddGroupByDialog
         {
             SourceTable = sourceTable,
             Lookups = lookups,
-            DerivedFields = derivedResult
+            DerivedFields = derivedResult,
+            CaseWhenFields = caseWhenResult
         };
 
         // Pre-populate if group by already exists
@@ -1010,11 +1136,16 @@ public partial class MainWindow : Window
             .FirstOrDefault(ent => ent.Metadata is GroupByResult)
             ?.Metadata as GroupByResult;
 
+        var caseWhenResultSort = QCanvas.Entities
+            .FirstOrDefault(ent => ent.Metadata is CaseWhenResult)
+            ?.Metadata as CaseWhenResult;
+
         var dialog = new AddSortingDialog
         {
             SourceTable = sourceTable,
             Lookups = lookups,
             DerivedFields = derivedResultSort,
+            CaseWhenFields = caseWhenResultSort,
             GroupByFields = groupByResultSort
         };
 
@@ -1138,6 +1269,11 @@ public partial class MainWindow : Window
                 {
                     state.EntityType = "Distinct";
                     state.Distinct = dr;
+                }
+                else if (entity.Metadata is CaseWhenResult cwr)
+                {
+                    state.EntityType = "CaseWhen";
+                    state.CaseWhen = cwr;
                 }
                 else if (entity.Metadata is GroupByResult gbr)
                 {
@@ -1273,6 +1409,14 @@ public partial class MainWindow : Window
                             metadata: es.Distinct!
                         );
                         break;
+                    case "CaseWhen":
+                        newEntity = QCanvas.AddEntity(
+                            label: es.Label, x: es.X, y: es.Y,
+                            width: es.Width, height: es.Height,
+                            fill: CaseWhenFill, stroke: CaseWhenStroke,
+                            metadata: es.CaseWhen!
+                        );
+                        break;
                     case "GroupBy":
                         newEntity = QCanvas.AddEntity(
                             label: es.Label, x: es.X, y: es.Y,
@@ -1309,6 +1453,8 @@ public partial class MainWindow : Window
                     lineBrush = Brushes.Teal;
                 else if (source.Metadata is DistinctResult || target.Metadata is DistinctResult)
                     lineBrush = Brushes.OrangeRed;
+                else if (source.Metadata is CaseWhenResult || target.Metadata is CaseWhenResult)
+                    lineBrush = Brushes.SlateGray;
                 else if (source.Metadata is GroupByResult || target.Metadata is GroupByResult)
                     lineBrush = Brushes.DeepPink;
                 else

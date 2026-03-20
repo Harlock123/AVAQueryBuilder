@@ -22,6 +22,7 @@
                     <Button x:Name="cmdAddTableSource" Content="Add Table Source" HorizontalAlignment="Stretch" Background="#90EE90" Foreground="Black" Click="CmdAddTableSource_Click" />
                     <Button x:Name="cmdAddConnectedSource" Content="Add Connected Source" HorizontalAlignment="Stretch" Background="#D8B4FE" Foreground="Black" IsEnabled="False" Click="CmdAddConnectedSource_Click" />
                     <Button x:Name="cmdAddDerived" Content="Add Derived" HorizontalAlignment="Stretch" Background="#A8E0CC" Foreground="Black" IsEnabled="False" Click="CmdAddDerived_Click" />
+                    <Button x:Name="cmdAddCaseWhen" Content="Add Case/When" HorizontalAlignment="Stretch" Background="#94A3B8" Foreground="Black" IsEnabled="False" Click="CmdAddCaseWhen_Click" />
                     <Button x:Name="cmdAddGroupBy" Content="Add Group By" HorizontalAlignment="Stretch" Background="#E879A8" Foreground="Black" IsEnabled="False" Click="CmdAddGroupBy_Click" />
                     <Button x:Name="cmdAddLimiter" Content="Add Limiter" HorizontalAlignment="Stretch" Background="#FCA5A5" Foreground="Black" IsEnabled="False" Click="CmdAddLimiter_Click" />
                     <Button x:Name="cmdToggleDistinct" Content="Add Distinct" HorizontalAlignment="Stretch" Background="#FDBA74" Foreground="Black" IsEnabled="False" Click="CmdToggleDistinct_Click" />

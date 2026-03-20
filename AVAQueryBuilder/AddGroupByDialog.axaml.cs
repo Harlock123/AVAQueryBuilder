@@ -19,6 +19,7 @@ public partial class AddGroupByDialog : Window
     public TableSourceResult SourceTable { get; set; } = null!;
     public List<ConnectedSourceResult> Lookups { get; set; } = new();
     public DerivedFieldResult? DerivedFields { get; set; }
+    public CaseWhenResult? CaseWhenFields { get; set; }
     public GroupByResult? ExistingResult { get; set; }
     public GroupByResult? Result { get; private set; }
 
@@ -78,6 +79,16 @@ public partial class AddGroupByDialog : Window
             foreach (var df in DerivedFields.Fields)
             {
                 var expr = DerivedFieldViewModel.ToSqlExpression(df.SourceField, df.Derivation, df.Parameter);
+                fields.Add(expr);
+            }
+        }
+
+        // Add CASE/WHEN expressions
+        if (CaseWhenFields != null)
+        {
+            foreach (var ce in CaseWhenFields.Expressions)
+            {
+                var expr = BuildCaseExpressionText(ce);
                 fields.Add(expr);
             }
         }
@@ -331,5 +342,23 @@ public partial class AddGroupByDialog : Window
     {
         Result = null;
         Close(false);
+    }
+
+    private static string BuildCaseExpressionText(CaseExpression expr)
+    {
+        var sb = new System.Text.StringBuilder("CASE");
+        foreach (var wt in expr.Conditions)
+        {
+            if (wt.Operator is "IS NULL")
+                sb.Append($" WHEN {expr.Field} IS NULL THEN '{wt.ThenValue}'");
+            else if (wt.Operator is "IS NOT NULL")
+                sb.Append($" WHEN {expr.Field} IS NOT NULL THEN '{wt.ThenValue}'");
+            else
+                sb.Append($" WHEN {expr.Field} {wt.Operator} '{wt.WhenValue}' THEN '{wt.ThenValue}'");
+        }
+        if (!string.IsNullOrWhiteSpace(expr.ElseValue))
+            sb.Append($" ELSE '{expr.ElseValue}'");
+        sb.Append(" END");
+        return sb.ToString();
     }
 }

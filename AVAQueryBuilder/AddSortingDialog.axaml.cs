@@ -17,6 +17,7 @@ public partial class AddSortingDialog : Window
     public TableSourceResult SourceTable { get; set; } = null!;
     public List<ConnectedSourceResult> Lookups { get; set; } = new();
     public DerivedFieldResult? DerivedFields { get; set; }
+    public CaseWhenResult? CaseWhenFields { get; set; }
     public GroupByResult? GroupByFields { get; set; }
     public SortingResult? ExistingResult { get; set; }
     public SortingResult? Result { get; private set; }
@@ -72,6 +73,28 @@ public partial class AddSortingDialog : Window
             {
                 var expr = DerivedFieldViewModel.ToSqlExpression(df.SourceField, df.Derivation, df.Parameter);
                 fields.Add(expr);
+            }
+        }
+
+        // Add CASE/WHEN expressions
+        if (CaseWhenFields != null)
+        {
+            foreach (var ce in CaseWhenFields.Expressions)
+            {
+                var sb = new System.Text.StringBuilder("CASE");
+                foreach (var wt in ce.Conditions)
+                {
+                    if (wt.Operator is "IS NULL")
+                        sb.Append($" WHEN {ce.Field} IS NULL THEN '{wt.ThenValue}'");
+                    else if (wt.Operator is "IS NOT NULL")
+                        sb.Append($" WHEN {ce.Field} IS NOT NULL THEN '{wt.ThenValue}'");
+                    else
+                        sb.Append($" WHEN {ce.Field} {wt.Operator} '{wt.WhenValue}' THEN '{wt.ThenValue}'");
+                }
+                if (!string.IsNullOrWhiteSpace(ce.ElseValue))
+                    sb.Append($" ELSE '{ce.ElseValue}'");
+                sb.Append(" END");
+                fields.Add(sb.ToString());
             }
         }
 

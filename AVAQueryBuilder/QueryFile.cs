@@ -43,6 +43,9 @@ public class EntityState
     public DistinctResult? Distinct { get; set; }
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public CaseWhenResult? CaseWhen { get; set; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public GroupByResult? GroupBy { get; set; }
 }
 

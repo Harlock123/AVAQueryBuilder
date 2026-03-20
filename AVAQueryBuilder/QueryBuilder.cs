@@ -46,6 +46,11 @@ public static class QueryBuilder
 
         var isDistinct = entityList.Any(e => e.Metadata is DistinctResult);
 
+        var caseWhen = entityList
+            .Where(e => e.Metadata is CaseWhenResult)
+            .Select(e => (CaseWhenResult)e.Metadata!)
+            .FirstOrDefault();
+
         var groupBy = entityList
             .Where(e => e.Metadata is GroupByResult)
             .Select(e => (GroupByResult)e.Metadata!)
@@ -150,6 +155,16 @@ public static class QueryBuilder
             }
         }
 
+        // CASE/WHEN expressions
+        if (caseWhen != null)
+        {
+            foreach (var expr in caseWhen.Expressions)
+            {
+                var caseSql = FormatCaseExpression(expr);
+                allColumns.Add(caseSql);
+            }
+        }
+
         AppendWrappedList(sb, allColumns, "       ");
         sb.AppendLine();
 
@@ -222,6 +237,26 @@ public static class QueryBuilder
             AppendWrappedList(sb, orderParts, "         ");
         }
 
+        return sb.ToString();
+    }
+
+    private static string FormatCaseExpression(CaseExpression expr)
+    {
+        var sb = new System.Text.StringBuilder("CASE");
+        foreach (var wt in expr.Conditions)
+        {
+            if (wt.Operator is "IS NULL")
+                sb.Append($" WHEN {expr.Field} IS NULL THEN '{wt.ThenValue}'");
+            else if (wt.Operator is "IS NOT NULL")
+                sb.Append($" WHEN {expr.Field} IS NOT NULL THEN '{wt.ThenValue}'");
+            else
+                sb.Append($" WHEN {expr.Field} {wt.Operator} '{wt.WhenValue}' THEN '{wt.ThenValue}'");
+        }
+        if (!string.IsNullOrWhiteSpace(expr.ElseValue))
+            sb.Append($" ELSE '{expr.ElseValue}'");
+        sb.Append(" END");
+        if (!string.IsNullOrWhiteSpace(expr.Alias))
+            sb.Append($" AS [{expr.Alias}]");
         return sb.ToString();
     }
 
