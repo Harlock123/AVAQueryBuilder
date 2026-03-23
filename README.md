@@ -121,21 +121,21 @@ The generated SQL is displayed using the [SyntaxColorizer](https://github.com/Ha
 
 ```
 +------------------+--------------------------------------------+
-|                  |  Connection String                          |
+|                  |  Connection String                         |
 |  [Connect]       +--------------------------------------------+
 |  [Add Table]     |                                            |
 |  [Add Lookup]    |  Canvas (AVASdCanvas)                      |
-|  [Add Derived]   |  +--------+     +-----------+             |
-|  [Add Group By]  |  | Table  |<----| Lookup    |             |
-|  [Add Limiter]   |  +--------+     +-----------+             |
-|  [Add Distinct]  |    |  |  |      +-----------+             |
-|  [Add Filter]    |    |  |  +----->| TOP 100   |             |
-|  [Add Sorting]   |    |  +------->| WHERE (3) |             |
-|                  |    +---------->| ORDER BY  |             |
-|                  |    |           +-----------+             |
-|                  |    +---------->| GROUP BY  |             |
-|                  |  +----------+                             |
-|                  |  | DISTINCT |                             |
+|  [Add Derived]   |  +--------+     +-----------+              |
+|  [Add Group By]  |  | Table  |<----| Lookup    |              |
+|  [Add Limiter]   |  +--------+     +-----------+              |
+|  [Add Distinct]  |    |  |  |      +-----------+              |
+|  [Add Filter]    |    |  |  +----->| TOP 100   |              |
+|  [Add Sorting]   |    |  +------->| WHERE (3) |               |
+|                  |    +---------->| ORDER BY  |               |
+|                  |    |           +-----------+               |
+|                  |    +---------->| GROUP BY  |               |
+|                  |  +----------+                              |
+|                  |  | DISTINCT |                              |
 |  ----------      |                                            |
 |  [Clear Canvas]  +==========[ Copy SQL ][ Execute ][ Export ]=+
 |  [Save Query]    |  [Derived Query] [Results Grid]            |
