@@ -9,52 +9,36 @@ public static class QueryBuilder
 {
     private const int MaxLineWidth = 80;
 
-    public static string BuildQuery(IEnumerable<GraphicEntity> entities)
+    public static string BuildQuery(IEnumerable<GraphicEntity> entities) =>
+        BuildQuery(entities.Select(e => e.Metadata), AppState.Engine);
+
+    /// <summary>
+    /// The SELECT for the canvas entities' metadata (<see cref="TableSourceResult"/> and the rest), in
+    /// <paramref name="engine"/>'s dialect.
+    /// </summary>
+    public static string BuildQuery(IEnumerable<object?> metadata, DbEngine engine)
     {
-        var entityList = entities.ToList();
+        var entityList = metadata.ToList();
 
-        var tableSources = entityList
-            .Where(e => e.Metadata is TableSourceResult)
-            .Select(e => (TableSourceResult)e.Metadata!)
-            .ToList();
+        var tableSources = entityList.OfType<TableSourceResult>().ToList();
 
-        var lookups = entityList
-            .Where(e => e.Metadata is ConnectedSourceResult)
-            .Select(e => (ConnectedSourceResult)e.Metadata!)
+        var lookups = entityList.OfType<ConnectedSourceResult>()
             .OrderBy(l => l.OrdinalValue)
             .ToList();
 
-        var limiter = entityList
-            .Where(e => e.Metadata is LimiterResult)
-            .Select(e => (LimiterResult)e.Metadata!)
-            .FirstOrDefault();
+        var limiter = entityList.OfType<LimiterResult>().FirstOrDefault();
 
-        var filters = entityList
-            .Where(e => e.Metadata is FilterResult)
-            .Select(e => (FilterResult)e.Metadata!)
-            .ToList();
+        var filters = entityList.OfType<FilterResult>().ToList();
 
-        var sorting = entityList
-            .Where(e => e.Metadata is SortingResult)
-            .Select(e => (SortingResult)e.Metadata!)
-            .FirstOrDefault();
+        var sorting = entityList.OfType<SortingResult>().FirstOrDefault();
 
-        var derived = entityList
-            .Where(e => e.Metadata is DerivedFieldResult)
-            .Select(e => (DerivedFieldResult)e.Metadata!)
-            .FirstOrDefault();
+        var derived = entityList.OfType<DerivedFieldResult>().FirstOrDefault();
 
-        var isDistinct = entityList.Any(e => e.Metadata is DistinctResult);
+        var isDistinct = entityList.OfType<DistinctResult>().Any();
 
-        var caseWhen = entityList
-            .Where(e => e.Metadata is CaseWhenResult)
-            .Select(e => (CaseWhenResult)e.Metadata!)
-            .FirstOrDefault();
+        var caseWhen = entityList.OfType<CaseWhenResult>().FirstOrDefault();
 
-        var groupBy = entityList
-            .Where(e => e.Metadata is GroupByResult)
-            .Select(e => (GroupByResult)e.Metadata!)
-            .FirstOrDefault();
+        var groupBy = entityList.OfType<GroupByResult>().FirstOrDefault();
 
         if (tableSources.Count == 0)
             return string.Empty;
@@ -66,8 +50,8 @@ public static class QueryBuilder
         if (isDistinct)
             sb.Append("DISTINCT ");
 
-        // TOP N clause
-        if (limiter != null)
+        // TOP N clause (SQL Server); the others end the query with LIMIT N
+        if (limiter != null && Dialect.LimitsWithTop(engine))
             sb.Append($"TOP {limiter.TopCount} ");
 
         var allColumns = new List<string>();
@@ -82,16 +66,16 @@ public static class QueryBuilder
                 if (derived != null)
                 {
                     var matchingDerived = derived.Fields.FirstOrDefault(df =>
-                        DerivedFieldViewModel.ToSqlExpression(df.SourceField, df.Derivation, df.Parameter) == gf);
+                        DerivedFieldViewModel.ToSqlExpression(df.SourceField, df.Derivation, df.Parameter, engine) == gf);
                     if (matchingDerived != null && !string.IsNullOrWhiteSpace(matchingDerived.Alias))
-                        colExpr += $" AS [{matchingDerived.Alias}]";
+                        colExpr += Dialect.As(engine, matchingDerived.Alias);
                 }
                 if (caseWhen != null)
                 {
                     var matchingCase = caseWhen.Expressions.FirstOrDefault(ce =>
                         FormatCaseExpressionNoAlias(ce) == gf);
                     if (matchingCase != null && !string.IsNullOrWhiteSpace(matchingCase.Alias))
-                        colExpr += $" AS [{matchingCase.Alias}]";
+                        colExpr += Dialect.As(engine, matchingCase.Alias);
                 }
                 allColumns.Add(colExpr);
             }
@@ -100,7 +84,7 @@ public static class QueryBuilder
             {
                 var expr = FormatAggregate(agg);
                 if (!string.IsNullOrWhiteSpace(agg.Alias))
-                    expr += $" AS [{agg.Alias}]";
+                    expr += Dialect.As(engine, agg.Alias);
                 allColumns.Add(expr);
             }
 
@@ -109,11 +93,11 @@ public static class QueryBuilder
             {
                 foreach (var df in derived.Fields)
                 {
-                    var expr = DerivedFieldViewModel.ToSqlExpression(df.SourceField, df.Derivation, df.Parameter);
+                    var expr = DerivedFieldViewModel.ToSqlExpression(df.SourceField, df.Derivation, df.Parameter, engine);
                     if (!groupBy.GroupFields.Contains(expr))
                     {
                         if (!string.IsNullOrWhiteSpace(df.Alias))
-                            expr += $" AS [{df.Alias}]";
+                            expr += Dialect.As(engine, df.Alias);
                         allColumns.Add(expr);
                     }
                 }
@@ -131,7 +115,7 @@ public static class QueryBuilder
                 {
                     var colExpr = $"{prefix}{col}";
                     if (table.ColumnAliases.TryGetValue(col, out var colAlias) && !string.IsNullOrWhiteSpace(colAlias))
-                        colExpr += $" AS [{colAlias}]";
+                        colExpr += Dialect.As(engine, colAlias);
                     allColumns.Add(colExpr);
                 }
             }
@@ -144,7 +128,7 @@ public static class QueryBuilder
                 {
                     var colExpr = $"{tableAlias}.{col}";
                     if (lookup.ColumnAliases.TryGetValue(col, out var colAlias) && !string.IsNullOrWhiteSpace(colAlias))
-                        colExpr += $" AS [{colAlias}]";
+                        colExpr += Dialect.As(engine, colAlias);
                     allColumns.Add(colExpr);
                 }
             }
@@ -154,9 +138,9 @@ public static class QueryBuilder
             {
                 foreach (var df in derived.Fields)
                 {
-                    var expr = DerivedFieldViewModel.ToSqlExpression(df.SourceField, df.Derivation, df.Parameter);
+                    var expr = DerivedFieldViewModel.ToSqlExpression(df.SourceField, df.Derivation, df.Parameter, engine);
                     if (!string.IsNullOrWhiteSpace(df.Alias))
-                        expr += $" AS [{df.Alias}]";
+                        expr += Dialect.As(engine, df.Alias);
                     allColumns.Add(expr);
                 }
             }
@@ -171,7 +155,7 @@ public static class QueryBuilder
                 // Check if this CASE expression is already in allColumns (via group fields)
                 if (allColumns.Any(c => c.StartsWith(caseSqlNoAlias)))
                     continue;
-                var caseSql = FormatCaseExpression(expr);
+                var caseSql = FormatCaseExpression(expr, engine);
                 allColumns.Add(caseSql);
             }
         }
@@ -211,7 +195,7 @@ public static class QueryBuilder
                 var whereParts = new List<string>();
                 foreach (var c in filter.Conditions)
                 {
-                    var clause = FormatCondition(c);
+                    var clause = FormatCondition(c, engine);
                     if (clause != null)
                         whereParts.Add(clause);
                 }
@@ -263,6 +247,12 @@ public static class QueryBuilder
             AppendWrappedList(sb, orderParts, "         ");
         }
 
+        if (limiter != null && !Dialect.LimitsWithTop(engine))
+        {
+            sb.AppendLine();
+            sb.Append($"LIMIT {limiter.TopCount}");
+        }
+
         return sb.ToString();
     }
 
@@ -284,7 +274,7 @@ public static class QueryBuilder
         return sb.ToString();
     }
 
-    private static string FormatCaseExpression(CaseExpression expr)
+    private static string FormatCaseExpression(CaseExpression expr, DbEngine engine)
     {
         var sb = new System.Text.StringBuilder("CASE");
         foreach (var wt in expr.Conditions)
@@ -300,7 +290,7 @@ public static class QueryBuilder
             sb.Append($" ELSE '{expr.ElseValue}'");
         sb.Append(" END");
         if (!string.IsNullOrWhiteSpace(expr.Alias))
-            sb.Append($" AS [{expr.Alias}]");
+            sb.Append(Dialect.As(engine, expr.Alias));
         return sb.ToString();
     }
 
@@ -314,17 +304,14 @@ public static class QueryBuilder
         };
     }
 
-    private static string? FormatCondition(FilterCondition c)
+    private static string? FormatCondition(FilterCondition c, DbEngine engine)
     {
         var field = c.Field;
         if (string.IsNullOrWhiteSpace(field)) return null;
 
         var castAs = c.CastAs;
         if (!string.IsNullOrWhiteSpace(castAs) && castAs != "(none)")
-        {
-            var castType = castAs == "VARCHAR" ? "VARCHAR(MAX)" : castAs;
-            field = $"CAST({field} AS {castType})";
-        }
+            field = Dialect.Cast(engine, field, castAs);
 
         return c.Operator switch
         {

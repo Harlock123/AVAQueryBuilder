@@ -6,6 +6,10 @@ namespace AVAQueryBuilder;
 public class QueryFile
 {
     public string ConnectionString { get; set; } = string.Empty;
+
+    /// <summary>The engine the query was written for. Files saved before engines existed are SQL Server.</summary>
+    [JsonConverter(typeof(JsonStringEnumConverter))]
+    public DbEngine Engine { get; set; } = DbEngine.SqlServer;
     public int LookupOrdinal { get; set; }
     public List<EntityState> Entities { get; set; } = new();
     public List<ConnectorState> Connectors { get; set; } = new();

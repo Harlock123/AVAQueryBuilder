@@ -21,6 +21,12 @@
     <PackageReference Include="AVASdCanvas" Version="1.0.1" />
     <PackageReference Include="LAWgrid" Version="1.0.2" />
     <PackageReference Include="Microsoft.Data.SqlClient" Version="6.1.4" />
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="9.0.22" />
+    <PackageReference Include="Npgsql" Version="9.0.5" />
     <PackageReference Include="SyntaxColorizer" Version="1.0.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="AVAQueryBuilder.Tests" />
   </ItemGroup>
 </Project>

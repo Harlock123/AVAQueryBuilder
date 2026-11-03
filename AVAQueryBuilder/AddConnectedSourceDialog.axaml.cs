@@ -5,7 +5,6 @@ using System.Linq;
 using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
-using Microsoft.Data.SqlClient;
 
 namespace AVAQueryBuilder;
 
@@ -110,21 +109,8 @@ public partial class AddConnectedSourceDialog : Window
             var items = new List<string>();
             await Task.Run(() =>
             {
-                using var conn = new SqlConnection(connStr);
-                conn.Open();
-
-                using var cmd = new SqlCommand(
-                    "SELECT TABLE_SCHEMA, TABLE_NAME, TABLE_TYPE FROM INFORMATION_SCHEMA.TABLES " +
-                    "ORDER BY TABLE_TYPE, TABLE_SCHEMA, TABLE_NAME", conn);
-                using var reader = cmd.ExecuteReader();
-                while (reader.Read())
-                {
-                    var schema = reader.GetString(0);
-                    var name = reader.GetString(1);
-                    var type = reader.GetString(2).Trim();
-                    var prefix = type == "VIEW" ? "V: " : "T: ";
-                    items.Add($"{prefix}{schema}.{name}");
-                }
+                foreach (var t in Db.ListTables(AppState.Engine, connStr))
+                    items.Add($"{(t.IsView ? "V: " : "T: ")}{t.FullName}");
             });
 
             _lookupTables.Clear();
@@ -155,25 +141,7 @@ public partial class AddConnectedSourceDialog : Window
         var connStr = AppState.ConnectionString;
         if (string.IsNullOrWhiteSpace(connStr)) return;
 
-        var columns = new List<string>();
-        var parts = tableName.Split('.', 2);
-        var schema = parts[0];
-        var table = parts[1];
-
-        await Task.Run(() =>
-        {
-            using var conn = new SqlConnection(connStr);
-            conn.Open();
-            using var cmd = new SqlCommand(
-                "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS " +
-                "WHERE TABLE_SCHEMA = @schema AND TABLE_NAME = @table " +
-                "ORDER BY ORDINAL_POSITION", conn);
-            cmd.Parameters.AddWithValue("@schema", schema);
-            cmd.Parameters.AddWithValue("@table", table);
-            using var reader = cmd.ExecuteReader();
-            while (reader.Read())
-                columns.Add(reader.GetString(0));
-        });
+        var columns = await Task.Run(() => Db.ListColumns(AppState.Engine, connStr, tableName));
 
         foreach (var col in columns)
             _joinFields.Add(col);

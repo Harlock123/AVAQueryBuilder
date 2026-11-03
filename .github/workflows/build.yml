@@ -1,4 +1,4 @@
-# Every push: build, then publish AVAQueryBuilder as a self-contained single-file program for
+# Every push: build and test, then publish AVAQueryBuilder as a self-contained single-file program for
 # Windows, macOS and Linux on Intel/AMD and ARM. The builds are attached to the workflow run; pushes to the
 # default branch also refresh the "latest" pre-release, and a v* tag (e.g. v0.1.0) makes a proper release.
 name: Build
@@ -33,6 +33,9 @@ jobs:
           dotnet-version: '9.0.x'
       - name: Build
         run: dotnet build AVAQueryBuilder.sln -c Release
+      - name: Test
+        # No database servers here: the SQL Server and PostgreSQL tests skip, SQLite's run.
+        run: dotnet test AVAQueryBuilder.sln -c Release --no-build
 
   publish:
     needs: build

@@ -6,7 +6,10 @@ using System.Net.Sockets;
 using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
+using Avalonia.Platform.Storage;
 using Microsoft.Data.SqlClient;
+using Microsoft.Data.Sqlite;
+using Npgsql;
 
 namespace AVAQueryBuilder;
 
@@ -16,51 +19,127 @@ public partial class ConnectionStringDialog : Window
     private readonly ObservableCollection<string> _databases = new();
 
     public string ResultConnectionString { get; private set; } = string.Empty;
+    public DbEngine ResultEngine { get; private set; } = DbEngine.SqlServer;
 
-    public ConnectionStringDialog()
+    public ConnectionStringDialog() : this(DbEngine.SqlServer)
+    {
+    }
+
+    public ConnectionStringDialog(DbEngine engine)
     {
         InitializeComponent();
         cboServer.ItemsSource = _servers;
         cboDatabase.ItemsSource = _databases;
         cboServer.SelectionChanged += CboServer_SelectionChanged;
         cboDatabase.SelectionChanged += CboDatabase_SelectionChanged;
+        cboEngine.SelectedIndex = (int)engine;
+        ApplyEngine();
+    }
+
+    private DbEngine Engine => cboEngine.SelectedIndex switch
+    {
+        1 => DbEngine.PostgreSql,
+        2 => DbEngine.Sqlite,
+        _ => DbEngine.SqlServer
+    };
+
+    /// <summary>Shows the fields the chosen engine uses and labels the server box for it.</summary>
+    private void ApplyEngine()
+    {
+        var engine = Engine;
+        lblServer.Text = engine switch
+        {
+            DbEngine.PostgreSql => "Host (host or host:port):",
+            DbEngine.Sqlite => "Database File:",
+            _ => "Server Name:"
+        };
+        cmdBrowseServers.Content = engine == DbEngine.Sqlite ? "Choose File..." : "Browse...";
+        cmdBrowseServers.IsVisible = engine != DbEngine.PostgreSql;
+        pnlAuth.IsVisible = engine == DbEngine.SqlServer;
+        pnlCredentials.IsVisible = engine != DbEngine.Sqlite;
+        pnlDatabase.IsVisible = engine != DbEngine.Sqlite;
+
+        var credentials = engine == DbEngine.PostgreSql || cboAuth.SelectedIndex == 1;
+        txtUsername.IsEnabled = credentials;
+        txtPassword.IsEnabled = credentials;
+
+        _servers.Clear();
+        _databases.Clear();
+        txtStatus.Text = string.Empty;
+        UpdateConnectionStringFromFields();
     }
 
     private string BuildConnectionString()
     {
-        var server = cboServer.SelectedItem as string ?? cboServer.Text ?? string.Empty;
-        var database = cboDatabase.SelectedItem as string ?? cboDatabase.Text ?? string.Empty;
-        var useWindowsAuth = cboAuth.SelectedIndex == 0;
+        var server = (cboServer.SelectedItem as string ?? cboServer.Text ?? string.Empty).Trim();
+        var database = (cboDatabase.SelectedItem as string ?? cboDatabase.Text ?? string.Empty).Trim();
 
         if (string.IsNullOrWhiteSpace(server))
             return string.Empty;
 
-        var builder = new SqlConnectionStringBuilder
+        switch (Engine)
         {
-            DataSource = server.Trim(),
-            TrustServerCertificate = true
-        };
+            case DbEngine.Sqlite:
+                // ReadWrite, not the default ReadWriteCreate: a mistyped path fails instead of making an empty file.
+                return new SqliteConnectionStringBuilder { DataSource = server, Mode = SqliteOpenMode.ReadWrite }
+                    .ConnectionString;
 
-        if (!string.IsNullOrWhiteSpace(database))
-            builder.InitialCatalog = database.Trim();
+            case DbEngine.PostgreSql:
+            {
+                var builder = new NpgsqlConnectionStringBuilder();
+                var colon = server.LastIndexOf(':');
+                if (colon > 0 && int.TryParse(server[(colon + 1)..], out var port))
+                {
+                    builder.Host = server[..colon];
+                    builder.Port = port;
+                }
+                else
+                {
+                    builder.Host = server;
+                }
+                if (!string.IsNullOrWhiteSpace(database))
+                    builder.Database = database;
+                builder.Username = txtUsername.Text ?? string.Empty;
+                builder.Password = txtPassword.Text ?? string.Empty;
+                return builder.ConnectionString;
+            }
 
-        if (useWindowsAuth)
-        {
-            builder.IntegratedSecurity = true;
+            default:
+            {
+                var builder = new SqlConnectionStringBuilder
+                {
+                    DataSource = server,
+                    TrustServerCertificate = true
+                };
+
+                if (!string.IsNullOrWhiteSpace(database))
+                    builder.InitialCatalog = database;
+
+                if (cboAuth.SelectedIndex == 0)
+                {
+                    builder.IntegratedSecurity = true;
+                }
+                else
+                {
+                    builder.IntegratedSecurity = false;
+                    builder.UserID = txtUsername.Text ?? string.Empty;
+                    builder.Password = txtPassword.Text ?? string.Empty;
+                }
+
+                return builder.ConnectionString;
+            }
         }
-        else
-        {
-            builder.IntegratedSecurity = false;
-            builder.UserID = txtUsername.Text ?? string.Empty;
-            builder.Password = txtPassword.Text ?? string.Empty;
-        }
-
-        return builder.ConnectionString;
     }
 
     private void UpdateConnectionStringFromFields()
     {
         txtConnectionString.Text = BuildConnectionString();
+    }
+
+    private void CboEngine_SelectionChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (txtUsername == null) return;
+        ApplyEngine();
     }
 
     private void CboAuth_SelectionChanged(object? sender, SelectionChangedEventArgs e)
@@ -77,11 +156,42 @@ public partial class ConnectionStringDialog : Window
         UpdateConnectionStringFromFields();
     }
 
-    private void TxtConnectionString_TextChanged(object? sender, TextChangedEventArgs e)
+    private void Field_TextChanged(object? sender, TextChangedEventArgs e)
     {
+        if (txtConnectionString == null) return;
+        UpdateConnectionStringFromFields();
     }
 
     private async void CmdBrowseServers_Click(object? sender, RoutedEventArgs e)
+    {
+        if (Engine == DbEngine.Sqlite)
+            await ChooseSqliteFileAsync();
+        else
+            await BrowseSqlServersAsync();
+    }
+
+    private async Task ChooseSqliteFileAsync()
+    {
+        var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = "Open SQLite Database",
+            AllowMultiple = false,
+            FileTypeFilter = new[]
+            {
+                new FilePickerFileType("SQLite Databases") { Patterns = new[] { "*.db", "*.sqlite", "*.sqlite3", "*.db3" } },
+                FilePickerFileTypes.All
+            }
+        });
+        var path = files.Count > 0 ? files[0].TryGetLocalPath() : null;
+        if (path == null) return;
+
+        _servers.Clear();
+        _servers.Add(path);
+        cboServer.SelectedIndex = 0;
+        UpdateConnectionStringFromFields();
+    }
+
+    private async Task BrowseSqlServersAsync()
     {
         txtStatus.Text = "Searching for SQL Server instances on the network...";
         cmdBrowseServers.IsEnabled = false;
@@ -182,6 +292,8 @@ public partial class ConnectionStringDialog : Window
 
     private async Task FetchDatabasesAsync()
     {
+        if (Engine == DbEngine.Sqlite) return;
+
         var connStr = BuildConnectionString();
         if (string.IsNullOrWhiteSpace(connStr))
         {
@@ -194,25 +306,8 @@ public partial class ConnectionStringDialog : Window
 
         try
         {
-            var builder = new SqlConnectionStringBuilder(connStr)
-            {
-                InitialCatalog = "master",
-                ConnectTimeout = 10
-            };
-
-            var databases = await Task.Run(() =>
-            {
-                var list = new List<string>();
-                using var conn = new SqlConnection(builder.ConnectionString);
-                conn.Open();
-                using var cmd = new SqlCommand(
-                    "SELECT name FROM sys.databases WHERE state_desc = 'ONLINE' ORDER BY name",
-                    conn);
-                using var reader = cmd.ExecuteReader();
-                while (reader.Read())
-                    list.Add(reader.GetString(0));
-                return list;
-            });
+            var engine = Engine;
+            var databases = await Task.Run(() => Db.ListDatabases(engine, connStr));
 
             _databases.Clear();
             foreach (var db in databases)
@@ -266,17 +361,8 @@ public partial class ConnectionStringDialog : Window
 
         try
         {
-            var builder = new SqlConnectionStringBuilder(connStr)
-            {
-                ConnectTimeout = 10
-            };
-
-            await Task.Run(() =>
-            {
-                using var conn = new SqlConnection(builder.ConnectionString);
-                conn.Open();
-            });
-
+            var engine = Engine;
+            await Task.Run(() => Db.Test(engine, connStr));
             txtStatus.Text = "Connection successful!";
         }
         catch (Exception ex)
@@ -292,6 +378,7 @@ public partial class ConnectionStringDialog : Window
     private void CmdOk_Click(object? sender, RoutedEventArgs e)
     {
         ResultConnectionString = txtConnectionString.Text ?? string.Empty;
+        ResultEngine = Engine;
         Close(true);
     }
 

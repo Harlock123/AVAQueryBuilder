@@ -6,7 +6,6 @@ using System.Text;
 using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
-using Microsoft.Data.SqlClient;
 
 namespace AVAQueryBuilder;
 
@@ -69,31 +68,8 @@ public partial class AddFilterDialog : Window
         _availableFields = fields;
     }
 
-    private static async Task<List<string>> GetAllColumnsAsync(string connStr, string schemaAndTable)
-    {
-        var columns = new List<string>();
-        var parts = schemaAndTable.Split('.', 2);
-        if (parts.Length != 2) return columns;
-        var schema = parts[0];
-        var table = parts[1];
-
-        await Task.Run(() =>
-        {
-            using var conn = new SqlConnection(connStr);
-            conn.Open();
-            using var cmd = new SqlCommand(
-                "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS " +
-                "WHERE TABLE_SCHEMA = @schema AND TABLE_NAME = @table " +
-                "ORDER BY ORDINAL_POSITION", conn);
-            cmd.Parameters.AddWithValue("@schema", schema);
-            cmd.Parameters.AddWithValue("@table", table);
-            using var reader = cmd.ExecuteReader();
-            while (reader.Read())
-                columns.Add(reader.GetString(0));
-        });
-
-        return columns;
-    }
+    private static Task<List<string>> GetAllColumnsAsync(string connStr, string schemaAndTable) =>
+        Task.Run(() => Db.ListColumns(AppState.Engine, connStr, schemaAndTable));
 
     private void RehydrateFromExisting()
     {
@@ -174,10 +150,7 @@ public partial class AddFilterDialog : Window
 
         var castAs = c.SelectedCastAs;
         if (!string.IsNullOrWhiteSpace(castAs) && castAs != "(none)")
-        {
-            var castType = castAs == "VARCHAR" ? "VARCHAR(MAX)" : castAs;
-            field = $"CAST({field} AS {castType})";
-        }
+            field = Dialect.Cast(AppState.Engine, field, castAs);
 
         return c.SelectedOperator switch
         {

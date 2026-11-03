@@ -145,7 +145,7 @@ public partial class MainWindow : Window
 
             case DerivedFieldResult d:
                 var derivedLines = d.Fields.Select(df =>
-                    $"  {DerivedFieldViewModel.ToSqlExpression(df.SourceField, df.Derivation, df.Parameter)} AS [{df.Alias}]");
+                    $"  {DerivedFieldViewModel.ToSqlExpression(df.SourceField, df.Derivation, df.Parameter)}{Dialect.As(AppState.Engine, df.Alias)}");
                 return $"Derived Fields ({d.Fields.Count})\n{string.Join("\n", derivedLines)}";
 
             case CaseWhenResult cw:
@@ -153,7 +153,7 @@ public partial class MainWindow : Window
                 {
                     var whenCount = expr.Conditions.Count;
                     var elseStr = string.IsNullOrWhiteSpace(expr.ElseValue) ? "" : $", ELSE '{expr.ElseValue}'";
-                    return $"  {expr.Field} ({whenCount} when{(whenCount != 1 ? "s" : "")}{elseStr}) AS [{expr.Alias}]";
+                    return $"  {expr.Field} ({whenCount} when{(whenCount != 1 ? "s" : "")}{elseStr}){Dialect.As(AppState.Engine, expr.Alias)}";
                 });
                 return $"CASE/WHEN ({cw.Expressions.Count})\n{string.Join("\n", caseLines)}";
 
@@ -166,7 +166,7 @@ public partial class MainWindow : Window
                     var expr = a.Function == "COUNT(*)" ? "COUNT(*)" :
                         a.Function == "COUNT DISTINCT" ? $"COUNT(DISTINCT {a.Field})" :
                         $"{a.Function}({a.Field})";
-                    return $"  {expr} AS [{a.Alias}]";
+                    return $"  {expr}{Dialect.As(AppState.Engine, a.Alias)}";
                 });
                 var gSummary = $"GROUP BY: {gFields}\nAggregates ({g.Aggregates.Count}):\n{string.Join("\n", aggLines)}";
                 if (g.HavingConditions.Count > 0)
@@ -541,13 +541,21 @@ public partial class MainWindow : Window
 
     private async void CmdConnectToData_Click(object? sender, RoutedEventArgs e)
     {
-        var dialog = new ConnectionStringDialog();
+        var dialog = new ConnectionStringDialog(AppState.Engine);
         var result = await dialog.ShowDialog<bool?>(this);
         if (result == true && !string.IsNullOrWhiteSpace(dialog.ResultConnectionString))
         {
-            AppState.ConnectionString = dialog.ResultConnectionString;
-            ConnectionStringTextBox.Text = dialog.ResultConnectionString;
+            SetConnection(dialog.ResultEngine, dialog.ResultConnectionString);
+            RebuildQuery();
         }
+    }
+
+    private void SetConnection(DbEngine engine, string connectionString)
+    {
+        AppState.Engine = engine;
+        AppState.ConnectionString = connectionString;
+        ConnectionStringTextBox.Text = connectionString;
+        txtConnectionLabel.Text = $"Connection String ({Db.DisplayName(engine)})";
     }
 
     private async void CmdAddTableSource_Click(object? sender, RoutedEventArgs e)
@@ -1056,10 +1064,12 @@ public partial class MainWindow : Window
             txtStatusBar.Text = "Executing query...";
 
             var sw = System.Diagnostics.Stopwatch.StartNew();
-            var result = await QResultsGrid.PopulateFromSqlQueryAsync(connStr, query);
+            var engine = AppState.Engine;
+            var rows = await Task.Run(() => Db.Run(engine, connStr, query));
+            QResultsGrid.PopulateFromDataTable(rows);
             sw.Stop();
 
-            txtStatusBar.Text = $"Returned {result.RowCount:N0} row(s) in {sw.Elapsed.TotalSeconds:F1}s";
+            txtStatusBar.Text = $"Returned {rows.Rows.Count:N0} row(s) in {sw.Elapsed.TotalSeconds:F1}s";
 
             // Switch to the Results Grid tab
             tabResultsGrid.IsSelected = true;
@@ -1252,6 +1262,7 @@ public partial class MainWindow : Window
             var queryFile = new QueryFile
             {
                 ConnectionString = AppState.ConnectionString,
+                Engine = AppState.Engine,
                 LookupOrdinal = _lookupOrdinal
             };
 
@@ -1373,8 +1384,7 @@ public partial class MainWindow : Window
             _lookupOrdinal = queryFile.LookupOrdinal;
 
             // Restore connection string
-            AppState.ConnectionString = queryFile.ConnectionString;
-            ConnectionStringTextBox.Text = queryFile.ConnectionString;
+            SetConnection(queryFile.Engine, queryFile.ConnectionString);
 
             // Map old entity IDs to new entities for connector restoration
             var idMap = new Dictionary<string, GraphicEntity>();

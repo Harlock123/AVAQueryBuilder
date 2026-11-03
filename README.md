@@ -1,6 +1,12 @@
 # AVA Query Builder
 
-A visual SQL query builder built with .NET 9 and [Avalonia UI](https://avaloniaui.net/). Construct SELECT queries by visually configuring entities on a structured diagram canvas, then execute them against Microsoft SQL Server and view results in an integrated data grid.
+A visual SQL query builder built with .NET 9 and [Avalonia UI](https://avaloniaui.net/). Construct SELECT queries by visually configuring entities on a structured diagram canvas, then execute them against Microsoft SQL Server, PostgreSQL or SQLite and view results in an integrated data grid.
+
+## Download
+
+Builds for Windows, macOS and Linux (Intel/AMD and ARM) are on the
+[latest release](https://github.com/Harlock123/AVAQueryBuilder/releases/tag/latest). Unzip or untar and run
+`AVAQueryBuilder` (`AVAQueryBuilder.exe` on Windows); nothing else needs installing.
 
 ## Overview
 
@@ -9,9 +15,10 @@ AVA Query Builder provides a graphical approach to building SQL queries. Instead
 ## Features
 
 ### Database Connection
-- **Server Discovery** — Browse for SQL Server instances on the local network via UDP broadcast to the SQL Browser service (port 1434).
-- **Authentication** — Supports both Windows Authentication and SQL Server Authentication.
-- **Database Selection** — Queries the server for available databases and populates a dropdown for selection.
+- **Three engines** — Microsoft SQL Server, PostgreSQL and SQLite. Pick one at the top of the Connect dialog; the dialog shows the fields that engine needs, and the generated SQL follows its dialect (see [SQL dialects](#sql-dialects)).
+- **Server Discovery** (SQL Server) — Browse for SQL Server instances on the local network via UDP broadcast to the SQL Browser service (port 1434).
+- **Authentication** — Windows Authentication or SQL Server Authentication for SQL Server; a username and password for PostgreSQL. SQLite needs none: choose the database file.
+- **Database Selection** — Queries the server for available databases and populates a dropdown for selection (SQL Server and PostgreSQL).
 - **Connection String** — Auto-built from selections, or manually editable for environments with non-standard configurations.
 - **Test Connection** — Verify connectivity before committing.
 
@@ -25,20 +32,20 @@ Entities are added to an interactive canvas ([AVASdCanvas](https://github.com/ha
 | **Connected Source (Lookup)** | Light Purple | A join to another table. Supports LEFT JOIN, INNER JOIN, RIGHT JOIN, and FULL OUTER JOIN via a dropdown selector. Specify join keys and return fields with optional aliases. Aliased as `LOOKUP_1`, `LOOKUP_2`, etc. Includes a blue **?** help button with a color-coded reference explaining each join type. |
 | **Derived Field** | Light Mint | Computed columns with 25+ derivations. **String:** UPPER, LOWER, TRIM, LEN, LEFT N, RIGHT N, REVERSE. **Date:** DATEPART (Year/Month/Day/Hour), DATENAME (Month/Day), Date Only, DATEDIFF (Days/Months/Years), DATEADD (Days/Months/Years). **Null handling:** ISNULL (Default), COALESCE (Fallback). **Numeric:** ABS, ROUND, CEILING, FLOOR. Each derived field requires an alias. |
 | **Group By** | Rose Pink | GROUP BY with aggregate functions (COUNT, COUNT(*), COUNT DISTINCT, SUM, AVG, MIN, MAX). Includes optional HAVING clause with AND/OR conditions. Supports grouping by derived field expressions. When active, replaces the normal column list with grouped fields and aggregates. |
-| **Limiter** | Light Red | Adds a `TOP N` clause to the query. Toggle button — click to add, click again to remove. |
+| **Limiter** | Light Red | Limits the query to its first N rows: `TOP N` on SQL Server, `LIMIT N` on PostgreSQL and SQLite. Toggle button — click to add, click again to remove. |
 | **Distinct** | Light Orange | Adds `SELECT DISTINCT` to eliminate duplicate rows. Toggle button — no dialog needed. |
 | **Filter** | Light Blue | Adds a `WHERE` clause with multiple conditions combined by AND/OR. Supports CAST AS (VARCHAR, INT, DATE, DATETIME, DECIMAL), BETWEEN, IN, NOT IN, LIKE, IS NULL, IS NOT NULL, IS EMPTY, IS NOT EMPTY. |
 | **Sorting** | Light Yellow | Adds an `ORDER BY` clause with multiple fields, each ASC or DESC. Can sort by derived field expressions and aggregate functions. |
 
 ### Entity Interaction
-- **Column Aliases** — Both table source and lookup return fields support optional aliases, generating `column AS [Alias]` in the SQL.
+- **Column Aliases** — Both table source and lookup return fields support optional aliases, generating `column AS [Alias]` in the SQL (`column AS "Alias"` on PostgreSQL and SQLite).
 - **Double-click** any entity to edit its configuration. Changes are reflected immediately in the generated SQL.
 - **Right-click** any entity for a context menu with Edit and Delete options. Deleting the base table removes all entities from the canvas.
 - **Hover** over any entity to see a styled tooltip with its metadata summary (pale yellow background, Consolas font).
 - **Toggle buttons** — Limiter and Distinct buttons toggle between Add/Remove states based on canvas state.
 
 ### Field Browser
-Dialogs with table/view selection (Add Table Source, Add Connected Source) include a **Field Browser** button that opens a large resizable dialog displaying `SELECT TOP 100 * FROM [table]` in a LAWGrid, allowing users to browse table data before selecting columns or join keys.
+Dialogs with table/view selection (Add Table Source, Add Connected Source) include a **Field Browser** button that opens a large resizable dialog displaying the table's first 100 rows in a LAWGrid, allowing users to browse table data before selecting columns or join keys.
 
 ### SQL Generation
 
@@ -75,6 +82,28 @@ ORDER BY COUNT(*) DESC
 ```
 
 The generated SQL updates live as entities are added, edited, or removed. Long lines are automatically wrapped at ~80 characters on natural boundaries.
+
+### SQL Dialects
+
+The examples above are SQL Server's. Connected to PostgreSQL or SQLite, the same canvas writes that engine's SQL:
+
+| | SQL Server | PostgreSQL | SQLite |
+|---|---|---|---|
+| Row limit | `SELECT TOP 100 …` | `… LIMIT 100` | `… LIMIT 100` |
+| Alias | `AS [Name]` | `AS "Name"` | `AS "Name"` |
+| Length | `LEN(x)` | `LENGTH(CAST(x AS TEXT))` | `LENGTH(x)` |
+| Year Part | `DATEPART(YEAR, x)` | `EXTRACT(YEAR FROM x)` | `STRFTIME('%Y', x)` |
+| Month Name | `DATENAME(MONTH, x)` | `TO_CHAR(x, 'FMMonth')` | a `CASE` on the month |
+| DATEDIFF (Days) | `DATEDIFF(DAY, x, p)` | `CAST(p AS DATE) - CAST(x AS DATE)` | `JULIANDAY(DATE(p)) - JULIANDAY(DATE(x))` |
+| DATEADD (Months) | `DATEADD(MONTH, p, x)` | `x + p * INTERVAL '1 month'` | `DATETIME(x, p \|\| ' months')` |
+| ISNULL (Default) | `ISNULL(x, 'p')` | `COALESCE(x, 'p')` | `IFNULL(x, 'p')` |
+| Cast as VARCHAR | `VARCHAR(MAX)` | `VARCHAR` | `TEXT` |
+
+DATEDIFF counts calendar boundaries crossed on every engine, as SQL Server does, so March 31 to April 1 is one month.
+A derivation's parameter is SQL in the connected engine's own syntax: a date is `GETDATE()` on SQL Server,
+`NOW()` or `CURRENT_DATE` on PostgreSQL, and `DATE('now')` on SQLite. SQLite has no `REVERSE`, so that
+derivation isn't offered there. Table and column names are written as the database reports them, unquoted;
+PostgreSQL folds unquoted names to lower case, so tables created with quoted mixed-case names won't resolve.
 
 ### Query Execution
 
@@ -117,6 +146,9 @@ The generated SQL is displayed using the [SyntaxColorizer](https://github.com/Ha
 ### Add Sorting Dialog (ORDER BY)
 ![Add Sorting Dialog](Screenshots/SS6.png)
 
+### Connect Dialog — choosing PostgreSQL
+![Connect Dialog](Screenshots/SS8.png)
+
 ## UI Layout
 
 ```
@@ -150,7 +182,7 @@ The generated SQL is displayed using the [SyntaxColorizer](https://github.com/Ha
 
 - **.NET 9** — Target framework
 - **Avalonia UI 11.3** — Cross-platform UI framework
-- **Microsoft.Data.SqlClient** — SQL Server connectivity
+- **Microsoft.Data.SqlClient**, **Npgsql** and **Microsoft.Data.Sqlite** — SQL Server, PostgreSQL and SQLite connectivity
 - **[LAWgrid](https://www.nuget.org/packages/LAWgrid)** — Data grid control by Lonnie Watson
 - **[SyntaxColorizer](https://www.nuget.org/packages/SyntaxColorizer)** — Syntax highlighting text editor by Lonnie Watson
 - **[AVASdCanvas](https://www.nuget.org/packages/AVASdCanvas)** — Structured diagram canvas by Lonnie Watson
@@ -167,6 +199,18 @@ dotnet build
 dotnet run --project AVAQueryBuilder
 ```
 
+## Testing
+
+```bash
+dotnet test
+```
+
+The tests build queries the way the dialogs do and run them on each engine: every derivation, joins, filters,
+grouping, sorting and limits. SQLite runs in a temporary file. SQL Server and PostgreSQL use the servers in
+`AQB_TEST_SQLSERVER` and `AQB_TEST_POSTGRES` (connection strings), falling back to the sample servers from
+[CCReimagined](https://github.com/Harlock123/CCReimagined)'s `dev/sample-databases` on localhost; when neither
+answers, those tests are skipped. Each run makes its own tables and drops them afterwards.
+
 ## Project Structure
 
 ```
@@ -174,7 +218,9 @@ AVAQueryBuilder/
 ├── MainWindow.axaml/.cs                  — Main window, canvas events, save/load
 ├── App.axaml/.cs                         — Application entry point
 ├── Program.cs                            — Host builder
-├── AppState.cs                           — Global state (connection string)
+├── AppState.cs                           — Global state (engine and connection string)
+├── Database.cs                           — Connections, schema lists and query runs for each engine
+├── Dialect.cs                            — What differs between the engines' SQL
 ├── QueryBuilder.cs                       — SQL generation with line wrapping
 ├── QueryFile.cs                          — Serialization model for .qry files
 ├── ConnectionStringDialog.axaml/.cs      — Database connection dialog
@@ -185,7 +231,7 @@ AVAQueryBuilder/
 ├── AddLimiterDialog.axaml/.cs            — TOP N limiter dialog
 ├── AddFilterDialog.axaml/.cs             — WHERE clause builder
 ├── AddSortingDialog.axaml/.cs            — ORDER BY builder
-├── FieldBrowserDialog.axaml/.cs          — Table data browser (TOP 100)
+├── FieldBrowserDialog.axaml/.cs          — Table data browser (first 100 rows)
 ├── JoinTypesHelpWindow.axaml/.cs         — Join type reference dialog
 ├── UnderConstructionWindow.axaml/.cs     — Placeholder dialog
 ├── TableSourceResult.cs                  — Table entity metadata
@@ -202,9 +248,10 @@ AVAQueryBuilder/
 ├── SortingFieldViewModel.cs              — Sorting row view model
 ├── ColumnItem.cs                         — Bindable column model with alias
 └── AVAQueryBuilder.csproj                — Project file
+tests/AVAQueryBuilder.Tests/              — Query tests on each engine, and the Connect dialog headless
 Screenshots/                              — Application screenshots
 ```
 
 ## License
 
-Copyright (c) Lonnie Watson. All rights reserved.
+MIT. See [LICENSE](LICENSE).

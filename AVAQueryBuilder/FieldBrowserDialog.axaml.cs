@@ -1,4 +1,5 @@
 using System;
+using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 
@@ -18,7 +19,7 @@ public partial class FieldBrowserDialog : Window
     {
         if (string.IsNullOrWhiteSpace(TableName)) return;
 
-        var query = $"SELECT TOP 100 * FROM {TableName}";
+        var query = Dialect.Preview(AppState.Engine, TableName, 100);
         BrowserGrid.GridTitle = query;
         Title = $"Field Browser — {TableName}";
 
@@ -31,7 +32,9 @@ public partial class FieldBrowserDialog : Window
 
         try
         {
-            await BrowserGrid.PopulateFromSqlQueryAsync(connStr, query);
+            var engine = AppState.Engine;
+            var rows = await Task.Run(() => Db.Run(engine, connStr, query));
+            BrowserGrid.PopulateFromDataTable(rows);
         }
         catch (Exception ex)
         {

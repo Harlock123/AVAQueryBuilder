@@ -50,7 +50,7 @@
                     Padding="4">
                 <StackPanel Spacing="2" VerticalAlignment="Center">
                     <TextBox x:Name="ConnectionStringTextBox" />
-                    <TextBlock Text="Connection String" FontSize="10" Foreground="Gray" />
+                    <TextBlock x:Name="txtConnectionLabel" Text="Connection String" FontSize="10" Foreground="Gray" />
                 </StackPanel>
             </Border>
 

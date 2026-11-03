@@ -104,37 +104,9 @@ public class DerivedFieldViewModel : INotifyPropertyChanged
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
     }
 
-    public static string ToSqlExpression(string field, string derivation, string parameter)
-    {
-        return derivation switch
-        {
-            "UPPER CASE" => $"UPPER({field})",
-            "lower case" => $"LOWER({field})",
-            "Trim" => $"TRIM({field})",
-            "Length" => $"LEN({field})",
-            "Left N Chars" => $"LEFT({field}, {parameter})",
-            "Right N Chars" => $"RIGHT({field}, {parameter})",
-            "Reverse" => $"REVERSE({field})",
-            "Year Part" => $"DATEPART(YEAR, {field})",
-            "Month Part" => $"DATEPART(MONTH, {field})",
-            "Day Part" => $"DATEPART(DAY, {field})",
-            "Hour Part" => $"DATEPART(HOUR, {field})",
-            "Month Name" => $"DATENAME(MONTH, {field})",
-            "Day Name" => $"DATENAME(WEEKDAY, {field})",
-            "Date Only" => $"CAST({field} AS DATE)",
-            "DATEDIFF (Days)" => $"DATEDIFF(DAY, {field}, {parameter})",
-            "DATEDIFF (Months)" => $"DATEDIFF(MONTH, {field}, {parameter})",
-            "DATEDIFF (Years)" => $"DATEDIFF(YEAR, {field}, {parameter})",
-            "DATEADD (Days)" => $"DATEADD(DAY, {parameter}, {field})",
-            "DATEADD (Months)" => $"DATEADD(MONTH, {parameter}, {field})",
-            "DATEADD (Years)" => $"DATEADD(YEAR, {parameter}, {field})",
-            "ISNULL (Default)" => $"ISNULL({field}, '{parameter}')",
-            "COALESCE (Fallback)" => $"COALESCE({field}, {parameter})",
-            "Absolute Value" => $"ABS({field})",
-            "Round to N Decimals" => $"ROUND({field}, {parameter})",
-            "Ceiling" => $"CEILING({field})",
-            "Floor" => $"FLOOR({field})",
-            _ => field
-        };
-    }
+    /// <summary>The derivations offered in the dialog, for the connected engine.</summary>
+    public List<string> AvailableDerivations { get; } = Dialect.Derivations(AppState.Engine);
+
+    public static string ToSqlExpression(string field, string derivation, string parameter, DbEngine? engine = null) =>
+        Dialect.Derive(engine ?? AppState.Engine, field, derivation, parameter);
 }

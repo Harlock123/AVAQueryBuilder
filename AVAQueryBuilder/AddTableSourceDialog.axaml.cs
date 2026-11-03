@@ -5,7 +5,6 @@ using System.Linq;
 using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
-using Microsoft.Data.SqlClient;
 
 namespace AVAQueryBuilder;
 
@@ -86,31 +85,8 @@ public partial class AddTableSourceDialog : Window
 
             await Task.Run(() =>
             {
-                using var conn = new SqlConnection(connStr);
-                conn.Open();
-
-                using var cmdTables = new SqlCommand(
-                    "SELECT TABLE_SCHEMA, TABLE_NAME FROM INFORMATION_SCHEMA.TABLES " +
-                    "WHERE TABLE_TYPE = 'BASE TABLE' ORDER BY TABLE_SCHEMA, TABLE_NAME", conn);
-                using var readerTables = cmdTables.ExecuteReader();
-                while (readerTables.Read())
-                {
-                    var schema = readerTables.GetString(0);
-                    var name = readerTables.GetString(1);
-                    tables.Add($"{schema}.{name}");
-                }
-                readerTables.Close();
-
-                using var cmdViews = new SqlCommand(
-                    "SELECT TABLE_SCHEMA, TABLE_NAME FROM INFORMATION_SCHEMA.VIEWS " +
-                    "ORDER BY TABLE_SCHEMA, TABLE_NAME", conn);
-                using var readerViews = cmdViews.ExecuteReader();
-                while (readerViews.Read())
-                {
-                    var schema = readerViews.GetString(0);
-                    var name = readerViews.GetString(1);
-                    views.Add($"{schema}.{name}");
-                }
+                foreach (var t in Db.ListTables(AppState.Engine, connStr))
+                    (t.IsView ? views : tables).Add(t.FullName);
             });
 
             _tables.Clear();
@@ -139,26 +115,7 @@ public partial class AddTableSourceDialog : Window
 
         try
         {
-            var columns = new List<string>();
-
-            var parts = schemaAndTable.Split('.', 2);
-            var schema = parts[0];
-            var table = parts[1];
-
-            await Task.Run(() =>
-            {
-                using var conn = new SqlConnection(connStr);
-                conn.Open();
-                using var cmd = new SqlCommand(
-                    "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS " +
-                    "WHERE TABLE_SCHEMA = @schema AND TABLE_NAME = @table " +
-                    "ORDER BY ORDINAL_POSITION", conn);
-                cmd.Parameters.AddWithValue("@schema", schema);
-                cmd.Parameters.AddWithValue("@table", table);
-                using var reader = cmd.ExecuteReader();
-                while (reader.Read())
-                    columns.Add(reader.GetString(0));
-            });
+            var columns = await Task.Run(() => Db.ListColumns(AppState.Engine, connStr, schemaAndTable));
 
             foreach (var col in columns)
                 _columns.Add(new ColumnItem { Name = col, IsSelected = true });

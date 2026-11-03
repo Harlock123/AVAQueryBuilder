@@ -12,7 +12,7 @@
                        Minimum="1" Maximum="1000000" Value="100"
                        Increment="10" FormatString="N0"
                        HorizontalAlignment="Stretch" Margin="0,0,0,8" />
-        <TextBlock Grid.Row="2" Text="Adds a TOP N clause to the SELECT statement."
+        <TextBlock Grid.Row="2" Text="TOP N on SQL Server, LIMIT N on PostgreSQL and SQLite." TextWrapping="Wrap"
                    FontSize="10" Foreground="Gray" Margin="0,0,0,8" />
         <StackPanel Grid.Row="4" Orientation="Horizontal"
                     HorizontalAlignment="Right" Spacing="8">
