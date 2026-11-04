@@ -1,6 +1,6 @@
 # AVA Query Builder
 
-A visual SQL query builder built with .NET 9 and [Avalonia UI](https://avaloniaui.net/). Construct SELECT queries by visually configuring entities on a structured diagram canvas, then execute them against Microsoft SQL Server, PostgreSQL or SQLite and view results in an integrated data grid.
+A visual SQL query builder built with .NET 10 and [Avalonia UI](https://avaloniaui.net/). Construct SELECT queries by visually configuring entities on a structured diagram canvas, then execute them against Microsoft SQL Server, PostgreSQL or SQLite and view results in an integrated data grid.
 
 ## Download
 
@@ -180,7 +180,7 @@ The generated SQL is displayed using the [SyntaxColorizer](https://github.com/Ha
 
 ## Technology Stack
 
-- **.NET 9** — Target framework
+- **.NET 10** — Target framework
 - **Avalonia UI 11.3** — Cross-platform UI framework
 - **Microsoft.Data.SqlClient**, **Npgsql** and **Microsoft.Data.Sqlite** — SQL Server, PostgreSQL and SQLite connectivity
 - **[LAWgrid](https://www.nuget.org/packages/LAWgrid)** — Data grid control by Lonnie Watson

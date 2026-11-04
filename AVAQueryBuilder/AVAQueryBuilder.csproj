@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net9.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
     <ApplicationManifest>app.manifest</ApplicationManifest>
@@ -21,8 +21,10 @@
     <PackageReference Include="AVASdCanvas" Version="1.0.1" />
     <PackageReference Include="LAWgrid" Version="1.0.2" />
     <PackageReference Include="Microsoft.Data.SqlClient" Version="6.1.4" />
-    <PackageReference Include="Microsoft.Data.Sqlite" Version="9.0.22" />
-    <PackageReference Include="Npgsql" Version="9.0.5" />
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.14" />
+    <!-- SqlClient 6.1 pulls in Pkcs 9.0.11, which has known advisories; take the patched one. -->
+    <PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.14" />
+    <PackageReference Include="Npgsql" Version="10.0.3" />
     <PackageReference Include="SyntaxColorizer" Version="1.0.2" />
   </ItemGroup>
 

@@ -5,7 +5,7 @@ the generated SQL; this file covers how the code is put together and the rules t
 
 ## What this is
 
-A visual query builder for Microsoft SQL Server, PostgreSQL and SQLite, in C# on .NET 9 and Avalonia 11.3. You
+A visual query builder for Microsoft SQL Server, PostgreSQL and SQLite, in C# on .NET 10 and Avalonia 11.3. You
 place entities (a base table, lookups, derived fields, CASE WHEN, group by, top N, distinct, filter, sorting) on
 an `AVASdCanvas` diagram; the app turns them into a `SELECT`, shows it in a `SyntaxColorizer` editor, runs it,
 and shows the rows in a `LAWgrid`. It runs on Windows, macOS and Linux.
@@ -26,7 +26,7 @@ schema (PostgreSQL) and drops it at the end.
 
 ## Layout
 
-- `AVAQueryBuilder/AVAQueryBuilder.csproj`: the app (`net9.0`, nullable on, compiled bindings).
+- `AVAQueryBuilder/AVAQueryBuilder.csproj`: the app (`net10.0`, nullable on, compiled bindings).
 - `AVAQueryBuilder/MainWindow.axaml(.cs)`: the window. It adds, edits and deletes canvas entities, toggles the
   limiter and distinct entities, executes the query, copies it, exports results, and saves and loads `.qry`
   files.
