@@ -2,6 +2,8 @@
 
 A visual SQL query builder built with .NET 10 and [Avalonia UI](https://avaloniaui.net/). Construct SELECT queries by visually configuring entities on a structured diagram canvas, then execute them against Microsoft SQL Server, PostgreSQL or SQLite and view results in an integrated data grid.
 
+It also has an **AI Chat** (F12) and an **MCP server**: ask for "the top 5 providers by charges" or "patients with no visit this year" and watch Claude, or a model running on your own computer, find the tables, build the query on the diagram, have the database check it and count the rows. The agent reads the database's structure, never its rows, unless you allow it. See [AI: the chat and agents](#ai-the-chat-and-agents).
+
 ## Download
 
 Builds for Windows, macOS and Linux (Intel/AMD and ARM) are on the
@@ -113,6 +115,7 @@ PostgreSQL folds unquoted names to lower case, so tables created with quoted mix
 - **Copy SQL** button copies the generated query text to the clipboard.
 - **Export to Excel** button exports the current results grid to an Excel file (`.xlsx`) with full formatting via a save file dialog.
 - **Clear Canvas** button resets all entities, connectors, query text, and results grid in one click.
+- **Undo and Redo** (Ctrl+Z, Ctrl+Y, the Undo and Redo buttons, or the Edit menu) step through every change to the query: entities added, edited or deleted, Clear Canvas, and an AI agent's steps.
 
 ### Syntax Highlighting
 
@@ -122,6 +125,68 @@ The generated SQL is displayed using the [SyntaxColorizer](https://github.com/Ha
 
 - **Save Query** (`.qry`) — Persists the entire query state to a JSON file: connection string, all canvas entities with positions and metadata, all connectors, and the lookup ordinal counter.
 - **Load Query** — Restores a previously saved query, rehydrating the canvas, connection string, and all entity configurations. Toggle button states (Limiter, Distinct) update automatically.
+- The **File** menu has New Query (Ctrl+N), Load Query (Ctrl+O), Save Query (Ctrl+S, to the file it came from) and Save Query As. The title bar shows the file and a `*` while there are unsaved changes.
+- Values in filters and CASE expressions are written as SQL string literals with any `'` doubled, so `O'Brien` matches O'Brien and no value can end the literal early.
+
+## AI: the chat and agents
+
+![The AI Chat on a local model: asked which providers bill the most, it reads the visits table, builds the query on the diagram (a lookup, a grouping, a sort and a limit), has the database check it and runs it; the rows appear in the Results Grid](Screenshots/ai-chat.png)
+
+**The AI Chat** (F12, or AI › AI Chat) docks on the right. Describe the query you want; the model reads the
+database's structure, builds the query with the same entities you use, checks it with the database, runs it and
+says what it returns. Each step shows in the panel as it happens and is one undo step (Ctrl+Z takes it back), and
+**Undo this reply** takes back a whole answer. The **Timeline** lists each reply that changed the query, with the
+diagram as it was before it. **History** keeps past chats if you tick Keep chat history.
+
+Setup… chooses the model, through either of two APIs:
+
+- **Anthropic API**: Claude (Opus, Sonnet or Haiku), with your Anthropic API key (Key…, or the
+  `ANTHROPIC_API_KEY` environment variable). Or give **Server** the address of a model server on this computer or
+  your network that speaks the same API, such as **LM Studio** (`http://localhost:1234`) or **Ollama**
+  (`http://localhost:11434`), and the model's name there (Refresh lists them). A local server needs no key.
+- **OpenAI-compatible**: LM Studio (`http://localhost:1234/v1`), Ollama (`http://localhost:11434/v1`), vLLM,
+  llama.cpp, a server elsewhere on your network, OpenAI or another cloud service, or a company gateway.
+
+![Setup with the Anthropic API pointed at LM Studio on this computer](Screenshots/ai-chat-setup.png)
+
+For a small local model, tick **Core tools only** (16 tools in place of 42; small models choose better among
+fewer), and leave **Model sees pictures** off unless it's a vision model. A model running on your own computer
+sends nothing anywhere and costs nothing; Claude's use is counted as it goes, with an estimated cost per chat,
+daily and monthly totals, and an optional budget (Setup…).
+
+**Protected data.** Query results are often patients', members' or staff records, so AI agents don't see them
+unless you turn on **AI › Let AI Agents See Query Results**. Until then an agent gets the database's catalogue
+(tables, columns, types, keys and foreign keys), a query's row count and its columns, and the rows go to your
+Results Grid only. Nothing an agent does writes to a database: queries are SELECTs, run inside a transaction that is
+rolled back (read-only on PostgreSQL and SQLite). Saved connections (AI › Database Connections) are shown to agents
+by name, engine and server, never with their passwords.
+
+**Agents outside the program.** Claude Code, Claude Desktop or any MCP client can work in the open window: turn on
+AI › Allow AI Agents (MCP), then add the server, for Claude Code:
+
+```bash
+claude mcp add avaquerybuilder -- /path/to/AVAQueryBuilder --mcp --attach
+```
+
+Without `--attach`, `AVAQueryBuilder --mcp` is a server with a query of its own and no window (add `--rows` to let
+its agents see rows). AI › Connect an Agent also opens a network door (MCP over HTTP, port 8771, with an access
+token) for agents on other computers. `AVAQueryBuilder --mcp --help` lists the options.
+
+**The tools** (42): reading the query and its SQL (for any engine, to port it); connections; the catalogue
+(`list_tables`, `describe_table` with the joins its foreign keys suggest, `find_columns`); building (`build_query`
+for a whole query in one call, then `add_table`, `add_lookup`, `add_filter`, `set_derived`, `set_case_when`,
+`set_group_by`, `set_sort`, `set_limit`, `set_distinct`, `remove` and their edits); `check_query` (the database
+checks the SQL), `run_query`, `export_results` (.csv or .xlsx) and `render_view` (a picture of the diagram); files
+in the working folder (AI › Working Folder); undo and redo; and for longer work `batch` (several changes as one
+undo step, or a dry run), checkpoints with `diff`, and steps files (`save_steps`, `run_steps`) that rerun a
+sequence with new values, such as a monthly report for another month.
+
+**Recipes** (MCP prompts): a question in plain words as a query, counts by month, records with no related record,
+possible duplicates, top N by a total, a date-range report kept to rerun, explaining a saved query, and moving a
+query to another engine.
+
+**Try it** on `samples/clinic.db`, a small made-up clinic (providers, patients and visits; every name and figure is
+invented): Connect to Data › SQLite, or AI › Database Connections.
 
 ## Screenshots
 
@@ -151,6 +216,8 @@ The generated SQL is displayed using the [SyntaxColorizer](https://github.com/Ha
 
 ## UI Layout
 
+A menu bar (File, Edit, AI) runs along the top, and the AI Chat docks on the right when it's open (F12).
+
 ```
 +------------------+--------------------------------------------+
 |                  |  Connection String                         |
@@ -169,6 +236,7 @@ The generated SQL is displayed using the [SyntaxColorizer](https://github.com/Ha
 |                  |  +----------+                              |
 |                  |  | DISTINCT |                              |
 |  ----------      |                                            |
+|  [Undo] [Redo]   |                                            |
 |  [Clear Canvas]  +==========[ Copy SQL ][ Execute ][ Export ]=+
 |  [Save Query]    |  [Derived Query] [Results Grid]            |
 |  [Load Query]    |  SELECT TOP 100 col1 AS [Name], ...        |
@@ -186,6 +254,8 @@ The generated SQL is displayed using the [SyntaxColorizer](https://github.com/Ha
 - **[LAWgrid](https://www.nuget.org/packages/LAWgrid)** — Data grid control by Lonnie Watson
 - **[SyntaxColorizer](https://www.nuget.org/packages/SyntaxColorizer)** — Syntax highlighting text editor by Lonnie Watson
 - **[AVASdCanvas](https://www.nuget.org/packages/AVASdCanvas)** — Structured diagram canvas by Lonnie Watson
+- **[ModelContextProtocol](https://www.nuget.org/packages/ModelContextProtocol.Core)** — the official C# MCP SDK, for the MCP server and its network door
+- **[Anthropic](https://www.nuget.org/packages/Anthropic)** — the official C# SDK, for the AI Chat's Anthropic API (Claude, or a local server that speaks it)
 
 ## Building
 
@@ -211,6 +281,18 @@ grouping, sorting and limits. SQLite runs in a temporary file. SQL Server and Po
 [CCReimagined](https://github.com/Harlock123/CCReimagined)'s `dev/sample-databases` on localhost; when neither
 answers, those tests are skipped. Each run makes its own tables and drops them afterwards.
 
+The agent tests drive the MCP server through a real MCP client, on a copy of `samples/clinic.db`: every tool, every
+recipe call by call, the open window (Ctrl+Z undoing an agent's step), the pipe and network doors, and the chat on
+scripted fakes of both model APIs. No real model, key or server is used. Two kinds of test are opt-in:
+
+```bash
+AQB_LIVE_SERVER=http://localhost:11434 AQB_LIVE_MODEL=qwen3:1.7b dotnet test --filter LiveModelTests
+AQB_SHOTS=/tmp/shots dotnet test --filter "Pictures|AiChatScreenshot"
+```
+
+The first runs the chat on a real model through both APIs (Ollama speaks both; the model must call tools). The
+second writes the README's pictures.
+
 ## Project Structure
 
 ```
@@ -223,6 +305,9 @@ AVAQueryBuilder/
 ├── Dialect.cs                            — What differs between the engines' SQL
 ├── QueryBuilder.cs                       — SQL generation with line wrapping
 ├── QueryFile.cs                          — Serialization model for .qry files
+├── QueryModel.cs                         — QueryEdits (every change to a query) and QueryHistory (undo/redo)
+├── QueryLook.cs                          — How a query is drawn on the canvas
+├── Agents/                               — The AI Chat (Chat/, ChatPanel.cs) and the MCP server (Mcp/)
 ├── ConnectionStringDialog.axaml/.cs      — Database connection dialog
 ├── AddTableSourceDialog.axaml/.cs        — Table/view and column selection
 ├── AddConnectedSourceDialog.axaml/.cs    — Lookup join configuration
@@ -248,7 +333,8 @@ AVAQueryBuilder/
 ├── SortingFieldViewModel.cs              — Sorting row view model
 ├── ColumnItem.cs                         — Bindable column model with alias
 └── AVAQueryBuilder.csproj                — Project file
-tests/AVAQueryBuilder.Tests/              — Query tests on each engine, and the Connect dialog headless
+tests/AVAQueryBuilder.Tests/              — Query tests on each engine, the Connect dialog headless, and the agent tests (Agents/)
+samples/                                  — clinic.sql and clinic.db, a made-up clinic to try queries on
 Screenshots/                              — Application screenshots
 ```
 

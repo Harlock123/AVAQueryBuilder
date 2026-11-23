@@ -256,43 +256,40 @@ public static class QueryBuilder
         return sb.ToString();
     }
 
-    private static string FormatCaseExpressionNoAlias(CaseExpression expr)
+    private static string FormatCaseExpressionNoAlias(CaseExpression expr) => CaseExpressionSql(expr);
+
+    /// <summary>A CASE expression's SQL without its alias, as group-by and sorting fields name it.</summary>
+    public static string CaseExpressionSql(CaseExpression expr)
     {
         var sb = new System.Text.StringBuilder("CASE");
         foreach (var wt in expr.Conditions)
         {
             if (wt.Operator is "IS NULL")
-                sb.Append($" WHEN {expr.Field} IS NULL THEN '{wt.ThenValue}'");
+                sb.Append($" WHEN {expr.Field} IS NULL THEN {Literal(wt.ThenValue)}");
             else if (wt.Operator is "IS NOT NULL")
-                sb.Append($" WHEN {expr.Field} IS NOT NULL THEN '{wt.ThenValue}'");
+                sb.Append($" WHEN {expr.Field} IS NOT NULL THEN {Literal(wt.ThenValue)}");
             else
-                sb.Append($" WHEN {expr.Field} {wt.Operator} '{wt.WhenValue}' THEN '{wt.ThenValue}'");
+                sb.Append($" WHEN {expr.Field} {wt.Operator} {Literal(wt.WhenValue)} THEN {Literal(wt.ThenValue)}");
         }
         if (!string.IsNullOrWhiteSpace(expr.ElseValue))
-            sb.Append($" ELSE '{expr.ElseValue}'");
+            sb.Append($" ELSE {Literal(expr.ElseValue)}");
         sb.Append(" END");
         return sb.ToString();
     }
 
     private static string FormatCaseExpression(CaseExpression expr, DbEngine engine)
     {
-        var sb = new System.Text.StringBuilder("CASE");
-        foreach (var wt in expr.Conditions)
-        {
-            if (wt.Operator is "IS NULL")
-                sb.Append($" WHEN {expr.Field} IS NULL THEN '{wt.ThenValue}'");
-            else if (wt.Operator is "IS NOT NULL")
-                sb.Append($" WHEN {expr.Field} IS NOT NULL THEN '{wt.ThenValue}'");
-            else
-                sb.Append($" WHEN {expr.Field} {wt.Operator} '{wt.WhenValue}' THEN '{wt.ThenValue}'");
-        }
-        if (!string.IsNullOrWhiteSpace(expr.ElseValue))
-            sb.Append($" ELSE '{expr.ElseValue}'");
-        sb.Append(" END");
+        var sql = CaseExpressionSql(expr);
         if (!string.IsNullOrWhiteSpace(expr.Alias))
-            sb.Append(Dialect.As(engine, expr.Alias));
-        return sb.ToString();
+            sql += Dialect.As(engine, expr.Alias);
+        return sql;
     }
+
+    /// <summary>
+    /// A value as an SQL string literal: in single quotes, with any quote inside doubled, so O'Brien is
+    /// 'O''Brien' and a value can never end the literal early. The same in all three engines.
+    /// </summary>
+    public static string Literal(string? value) => $"'{(value ?? string.Empty).Replace("'", "''")}'";
 
     private static string FormatAggregate(AggregateField agg)
     {
@@ -319,12 +316,12 @@ public static class QueryBuilder
             "IS NOT NULL" => $"{field} IS NOT NULL",
             "IS EMPTY" => $"{field} = ''",
             "IS NOT EMPTY" => $"{field} != ''",
-            "BETWEEN" => $"{field} BETWEEN '{c.Value}' AND '{c.Value2}'",
+            "BETWEEN" => $"{field} BETWEEN {Literal(c.Value)} AND {Literal(c.Value2)}",
             "IN" => $"{field} IN ({FormatInValues(c.Value)})",
             "NOT IN" => $"{field} NOT IN ({FormatInValues(c.Value)})",
-            "LIKE" => $"{field} LIKE '{c.Value}'",
-            "NOT LIKE" => $"{field} NOT LIKE '{c.Value}'",
-            _ => $"{field} {c.Operator} '{c.Value}'"
+            "LIKE" => $"{field} LIKE {Literal(c.Value)}",
+            "NOT LIKE" => $"{field} NOT LIKE {Literal(c.Value)}",
+            _ => $"{field} {c.Operator} {Literal(c.Value)}"
         };
     }
 
@@ -354,7 +351,7 @@ public static class QueryBuilder
 
     private static string FormatInValues(string value)
     {
-        var items = value.Split(',').Select(v => $"'{v.Trim()}'");
+        var items = value.Split(',').Select(v => Literal(v.Trim()));
         return string.Join(", ", items);
     }
 }

@@ -63,7 +63,7 @@ public sealed class TestDatabases : IDisposable
             Execute(conn, """
                 CREATE TABLE customer (id INTEGER PRIMARY KEY, name TEXT, nickname TEXT, code TEXT, city TEXT,
                                        joined TEXT, placed TEXT, balance NUMERIC, ratio REAL);
-                CREATE TABLE orders (id INTEGER PRIMARY KEY, customer_id INTEGER, amount NUMERIC);
+                CREATE TABLE orders (id INTEGER PRIMARY KEY, customer_id INTEGER REFERENCES customer(id), amount NUMERIC);
                 CREATE VIEW big_orders AS SELECT * FROM orders WHERE amount > 50;
                 """);
             Seed(conn, "main");
@@ -83,7 +83,7 @@ public sealed class TestDatabases : IDisposable
                 CREATE TABLE {schema}.customer (id INTEGER PRIMARY KEY, name VARCHAR(40), nickname VARCHAR(40),
                     code VARCHAR(10), city VARCHAR(40), joined DATE, placed TIMESTAMP, balance NUMERIC(10,2),
                     ratio NUMERIC(10,5));
-                CREATE TABLE {schema}.orders (id INTEGER PRIMARY KEY, customer_id INTEGER, amount NUMERIC(10,2));
+                CREATE TABLE {schema}.orders (id INTEGER PRIMARY KEY, customer_id INTEGER REFERENCES {schema}.customer(id), amount NUMERIC(10,2));
                 CREATE VIEW {schema}.big_orders AS SELECT * FROM {schema}.orders WHERE amount > 50;
                 """);
             Seed(conn, schema);
@@ -114,7 +114,7 @@ public sealed class TestDatabases : IDisposable
                 CREATE TABLE shop.customer (id INT PRIMARY KEY, name NVARCHAR(40), nickname NVARCHAR(40) NULL,
                     code NVARCHAR(10), city NVARCHAR(40), joined DATE, placed DATETIME2, balance DECIMAL(10,2),
                     ratio DECIMAL(10,5));
-                CREATE TABLE shop.orders (id INT PRIMARY KEY, customer_id INT, amount DECIMAL(10,2));
+                CREATE TABLE shop.orders (id INT PRIMARY KEY, customer_id INT REFERENCES shop.customer(id), amount DECIMAL(10,2));
                 """);
             Execute(conn, "CREATE VIEW shop.big_orders AS SELECT * FROM shop.orders WHERE amount > 50");
             Seed(conn, "shop");

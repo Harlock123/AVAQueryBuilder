@@ -8,9 +8,42 @@
         mc:Ignorable="d" d:DesignWidth="1000" d:DesignHeight="600"
         x:Class="AVAQueryBuilder.MainWindow"
         Title="AVA Query Builder"
-        Width="1000" Height="600">
+        Width="1200" Height="720">
 
-    <!-- Main horizontal split: Left (200px) | Right (800px) -->
+    <DockPanel>
+    <Menu DockPanel.Dock="Top">
+        <MenuItem Header="_File">
+            <MenuItem Header="_New Query" InputGesture="Ctrl+N" Click="MenuNew_Click" />
+            <MenuItem Header="_Load Query..." InputGesture="Ctrl+O" Click="CmdLoadQuery_Click" />
+            <MenuItem Header="_Save Query" InputGesture="Ctrl+S" Click="MenuSave_Click" />
+            <MenuItem Header="Save Query _As..." Click="CmdSaveQuery_Click" />
+        </MenuItem>
+        <MenuItem Header="_Edit">
+            <MenuItem x:Name="UndoMenuItem" Header="_Undo" InputGesture="Ctrl+Z" Click="MenuUndo_Click" />
+            <MenuItem x:Name="RedoMenuItem" Header="_Redo" InputGesture="Ctrl+Y" Click="MenuRedo_Click" />
+            <Separator />
+            <MenuItem Header="_Copy SQL" Click="CmdCopySql_Click" />
+            <MenuItem Header="C_lear Canvas" Click="CmdClearCanvas_Click" />
+        </MenuItem>
+        <MenuItem Header="_AI">
+            <MenuItem x:Name="ChatMenuItem" Header="AI _Chat" InputGesture="F12" ToggleType="CheckBox" Click="OnToggleChatClick" />
+            <Separator />
+            <MenuItem x:Name="SeeRowsMenuItem" Header="Let AI Agents _See Query Results" ToggleType="CheckBox" Click="OnSeeRowsClick" />
+            <MenuItem Header="_Database Connections..." Click="OnConnectionsClick" />
+            <Separator />
+            <MenuItem x:Name="AllowAgentsMenuItem" Header="_Allow AI Agents (MCP)" ToggleType="CheckBox" Click="OnAllowAgentsClick" />
+            <MenuItem Header="C_onnect an Agent..." Click="OnConnectAgentClick" />
+            <MenuItem Header="_Working Folder..." Click="OnWorkingFolderClick" />
+        </MenuItem>
+    </Menu>
+
+    <!-- The AI Chat (F12, AI > AI Chat), made the first time it is shown: MainWindow.Agents.cs. -->
+    <Border x:Name="ChatHolder" DockPanel.Dock="Right" Width="440" IsVisible="False"
+            BorderBrush="Gray" BorderThickness="1,0,0,0" />
+    <!-- Hidden: where render_view draws the diagram for agents (a canvas needs a window to take its look). -->
+    <Panel x:Name="AgentStage" DockPanel.Dock="Right" Width="0" Height="0" ClipToBounds="True" IsHitTestVisible="False" />
+
+    <!-- Main horizontal split: Left (200px) | Right -->
     <Grid ColumnDefinitions="200,Auto,*">
 
         <!-- Left Region (200px) -->
@@ -31,6 +64,10 @@
                 </StackPanel>
                 <StackPanel Grid.Row="1" Spacing="4" Margin="0,8,0,0">
                     <Separator />
+                    <Grid ColumnDefinitions="*,4,*">
+                        <Button x:Name="cmdUndo" Grid.Column="0" Content="Undo" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" IsEnabled="False" Click="MenuUndo_Click" ToolTip.Tip="Undo (Ctrl+Z)" />
+                        <Button x:Name="cmdRedo" Grid.Column="2" Content="Redo" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" IsEnabled="False" Click="MenuRedo_Click" ToolTip.Tip="Redo (Ctrl+Y)" />
+                    </Grid>
                     <Button x:Name="cmdClearCanvas" Content="Clear Canvas" HorizontalAlignment="Stretch" Click="CmdClearCanvas_Click" />
                     <Button x:Name="cmdSaveQuery" Content="Save Query" HorizontalAlignment="Stretch" Click="CmdSaveQuery_Click" />
                     <Button x:Name="cmdLoadQuery" Content="Load Query" HorizontalAlignment="Stretch" Click="CmdLoadQuery_Click" />
@@ -109,4 +146,5 @@
 
         </Grid>
     </Grid>
+    </DockPanel>
 </Window>

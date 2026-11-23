@@ -63,6 +63,48 @@ public sealed class QueryTests(TestDatabases databases) : IClassFixture<TestData
     }
 
     [Theory, MemberData(nameof(Engines))]
+    public void Describes_columns_keys_and_foreign_keys_from_the_catalogue(DbEngine engine)
+    {
+        var db = databases.For(engine);
+        var columns = Db.DescribeColumns(engine, db.ConnectionString, db.Table("orders"));
+        Assert.Equal(["id", "customer_id", "amount"], columns.Select(c => c.Name));
+        Assert.True(columns[0].PrimaryKey);
+        Assert.False(columns[1].PrimaryKey);
+
+        var fromOrders = Db.ForeignKeys(engine, db.ConnectionString, db.Table("orders"));
+        var key = Assert.Single(fromOrders);
+        Assert.Equal((db.Table("orders"), "customer_id", db.Table("customer"), "id"), (key.Table, key.Column, key.RefTable, key.RefColumn));
+        Assert.Equal(key, Assert.Single(Db.ForeignKeys(engine, db.ConnectionString, db.Table("customer"))));
+
+        var found = Db.FindColumns(engine, db.ConnectionString, "customer").Where(f => f.Table.StartsWith(db.Schema + ".")).ToList();
+        Assert.Contains(found, f => f.Table == db.Table("orders") && f.Column == "customer_id");
+    }
+
+    [Theory, MemberData(nameof(Engines))]
+    public void A_read_only_run_counts_and_keeps_rows_and_never_changes_anything(DbEngine engine)
+    {
+        var db = databases.For(engine);
+        var rows = Db.RunReadOnly(engine, db.ConnectionString, $"SELECT id, amount FROM {db.Table("orders")} ORDER BY id", keep: 2);
+        Assert.Equal(5, rows.Count);
+        Assert.Equal(2, rows.Rows.Count);
+        Assert.False(rows.More);
+        Assert.Equal("1", rows.Rows[0][0]);
+
+        try { Db.RunReadOnly(engine, db.ConnectionString, $"DELETE FROM {db.Table("orders")}", keep: 0); }
+        catch (System.Data.Common.DbException) { }
+        Assert.Equal(5, Db.Run(engine, db.ConnectionString, $"SELECT * FROM {db.Table("orders")}").Rows.Count);
+    }
+
+    [Theory, MemberData(nameof(Engines))]
+    public void Quotes_in_values_are_doubled_so_they_match_and_end_nothing(DbEngine engine)
+    {
+        var db = databases.For(engine);
+        var rows = Run(db, Customers(db, "name"),
+            new FilterResult { Conditions = [new FilterCondition { Field = db.Table("customer.name"), Operator = "IN", Value = "Ada Lovelace, O'Brien" }] });
+        Assert.Equal(["Ada Lovelace"], Column(rows, "name"));
+    }
+
+    [Theory, MemberData(nameof(Engines))]
     public void Joins_aliases_sorts_and_limits(DbEngine engine)
     {
         var db = databases.For(engine);
