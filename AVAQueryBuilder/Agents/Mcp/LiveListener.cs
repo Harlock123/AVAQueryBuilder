@@ -199,10 +199,10 @@ public static class LiveProtocol
 
     /// <summary>
     /// The pipe the live app listens on: per user, so two people on one machine each reach their own app. The
-    /// AVASVGMAKER_MCP_PIPE environment variable can name another (both the app and the bridge read it).
+    /// AVAQUERYBUILDER_MCP_PIPE environment variable can name another (both the app and the bridge read it).
     /// </summary>
     public static string PipeName =>
-        Environment.GetEnvironmentVariable("AVASVGMAKER_MCP_PIPE") is { Length: > 0 } custom ? custom
+        Environment.GetEnvironmentVariable("AVAQUERYBUILDER_MCP_PIPE") is { Length: > 0 } custom ? custom
             : "AVAQueryBuilder-mcp-" + new string(Environment.UserName.Select(ch => char.IsAsciiLetterOrDigit(ch) ? ch : '_').ToArray());
 
     public static JsonObject Hello(string root) => new() { ["protocol"] = "avaquerybuilder-mcp", ["version"] = Version, ["root"] = root };
